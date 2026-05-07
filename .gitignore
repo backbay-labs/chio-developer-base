@@ -28,7 +28,9 @@ kb-engine/uv.lock
 .obsidian/cache
 .obsidian/graph.json
 .obsidian/app.json
-.obsidian/hotkeys.json
+# hotkeys.json IS committed (canonical default bindings — see vault/_meta/hotkeys.md);
+# users override locally in Obsidian's Hotkeys settings, which writes to this file.
+# Skip-worktree on conflict: `git update-index --skip-worktree .obsidian/hotkeys.json`
 
 # Themes are user-installed
 .obsidian/themes/

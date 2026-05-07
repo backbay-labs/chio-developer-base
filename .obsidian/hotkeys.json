@@ -1,0 +1,11 @@
+{
+  "episode-promoter:promote-to-episode": [
+    { "modifiers": ["Mod", "Shift"], "key": "E" }
+  ],
+  "periodic-notes:open-daily-note": [
+    { "modifiers": ["Mod", "Shift"], "key": "T" }
+  ],
+  "obsidian-git:open-source-control-view": [
+    { "modifiers": ["Mod", "Shift"], "key": "G" }
+  ]
+}
