@@ -32,6 +32,10 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           enable-cache: true
+          # uv.lock files are gitignored per PR #599 convention; key the cache
+          # off pyproject.toml instead so the cache still works.
+          cache-dependency-glob: |
+            **/pyproject.toml
 
       - name: Run outcome evals
         id: eval
