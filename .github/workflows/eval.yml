@@ -37,6 +37,11 @@ jobs:
           cache-dependency-glob: |
             **/pyproject.toml
 
+      - name: Engine ↔ pack boundary check
+        # Hard rule #3 from AGENTS.md: kb-engine cannot import chio_*.
+        # Fails the build (no continue-on-error) — this rule is non-negotiable.
+        run: python3 ops/ci/check-imports.py
+
       - name: Run outcome evals
         id: eval
         # Phase 0: the runner reports "blocked-fixtures" / "blocked-runner" and

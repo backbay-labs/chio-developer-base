@@ -1,10 +1,15 @@
 [project]
 name = "kb-engine"
-version = "0.0.1"
+version = "0.1.0"
 description = "Generic retrieval / graph / MCP framework for chio-developer-base. Domain-agnostic."
 requires-python = ">=3.11"
 authors = [{ name = "Backbay" }]
 dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
 
 [build-system]
 requires = ["hatchling"]

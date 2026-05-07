@@ -1,32 +1,40 @@
 # kb-engine/
 
-> **Status:** placeholder. The engine package lands in **Phase 1.2** ([PLAN.md](../PLAN.md) phased delivery).
+> **Status:** Phase 1.2 contract surface landed (commit [`0f275da`+](https://github.com/backbay-labs/chio-developer-base/commits/main/kb-engine/)). The four plugin protocols + registry exist and are tested. Backing stores (pgvector / Neo4j / Graphiti / MCP server framework) are Phase 1.3+.
 
 The generic retrieval / graph / MCP framework. **Zero Chio knowledge.**
 
 ## Boundary contract
 
-This package MUST NOT import anything from `chio_pack` or any other domain pack. The boundary is enforced by `ops/ci/check-imports.py` (Phase 1 deliverable) and stated explicitly in [`AGENTS.md`](../AGENTS.md#hard-rules).
+This package MUST NOT import anything from `chio_pack` or any other domain pack. The boundary is enforced by [`ops/ci/check-imports.py`](../ops/ci/check-imports.py) and stated in [`AGENTS.md`](../AGENTS.md#hard-rules) hard rule #3.
 
 If `kb_engine/` ever needs Chio-specific behavior, the answer is to **register a plugin** via the four hooks below — never to leak Chio names into the engine.
 
-## Planned layout
+## Current layout (Phase 1.2)
 
 ```
 kb-engine/
 ├── pyproject.toml
 ├── kb_engine/
-│   ├── __init__.py
-│   ├── ingest/
-│   │   ├── code.py              CocoIndex hooks for source repos
-│   │   ├── docs.py              CocoIndex hooks for docs/specs
-│   │   └── vault.py             frontmatter parser; emits pgvector + graphiti
-│   ├── graph/                   Neo4j projector framework (schema-pack pluggable)
-│   ├── search/                  ranker, filters, rank_components emission
-│   ├── mcp/                     MCP server framework, tool registrar
-│   ├── receipt/                 signed-retrieval envelope (Phase 2B)
-│   └── plugin.py                the four plugin hooks
+│   ├── __init__.py              ← public API (protocols + types)
+│   ├── plugin.py                ← the four hook protocols + Registry
+│   └── types.py                 ← ParsedFile, Symbol, Node, Edge, DerivedRecord
 └── tests/
+    └── test_plugin.py           ← Registry dispatch, hook protocol conformance
+```
+
+## Planned (Phase 1.3+)
+
+```
+kb_engine/
+├── ingest/
+│   ├── code.py                  CocoIndex hooks for source repos
+│   ├── docs.py                  CocoIndex hooks for docs/specs
+│   └── vault.py                 frontmatter parser; emits pgvector + graphiti
+├── graph/                       Neo4j projector framework (schema-pack pluggable)
+├── search/                      ranker, filters, rank_components emission
+├── mcp/                         MCP server framework, tool registrar
+└── receipt/                     signed-retrieval envelope (Phase 2B)
 ```
 
 ## The four plugin hooks
