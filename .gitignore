@@ -35,9 +35,12 @@ kb-engine/uv.lock
 # Themes are user-installed
 .obsidian/themes/
 
-# Plugin code is downloaded by Obsidian on first launch (community plugins) or
-# built locally (our custom plugin). Don't commit either.
+# Plugin code is downloaded by Obsidian on first launch for community plugins.
+# For OUR custom plugins, main.js is committed (re-enabled below) so a fresh
+# checkout has working plugins without an npm build step on first launch.
 .obsidian/plugins/*/main.js
+!.obsidian/plugins/episode-promoter/main.js
+!.obsidian/plugins/kb-staleness-badge/main.js
 .obsidian/plugins/*/main.js.map
 .obsidian/plugins/*/styles.css
 .obsidian/plugins/*/versions.json

@@ -1,5 +1,6 @@
-# Built artifact — produced by `npm run build`
-main.js
+# Built artifact `main.js` IS committed — produced by `npm run build`.
+# Source maps are not (production builds disable sourcemaps; dev builds
+# produce inline maps embedded in main.js).
 main.js.map
 
 # npm

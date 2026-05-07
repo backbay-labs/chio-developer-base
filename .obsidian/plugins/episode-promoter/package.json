@@ -8,7 +8,13 @@
     "build": "node esbuild.config.mjs production",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
-  "keywords": ["obsidian", "plugin", "chio", "graphiti", "episode-promoter"],
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "chio",
+    "graphiti",
+    "episode-promoter"
+  ],
   "author": "Backbay",
   "license": "Apache-2.0",
   "devDependencies": {

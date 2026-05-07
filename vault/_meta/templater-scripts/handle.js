@@ -23,4 +23,4 @@
  * `_meta/templates/daily-note.md` for the consumers.
  */
 
-module.exports = async () => "@your-handle";
+module.exports = async () => "@connor";
