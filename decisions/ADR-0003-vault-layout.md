@@ -1,3 +1,14 @@
+---
+id: decisions.ADR-0003
+type: adr
+status: accepted
+date: 2026-05-07
+title: "Vault root is the repo root"
+owners:
+  - "@connor"
+supersedes: []
+---
+
 # ADR-0003 — Vault root is the repo root
 
 - **Status:** Accepted

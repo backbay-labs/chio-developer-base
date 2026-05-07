@@ -1,6 +1,6 @@
 {
   "name": "episode-promoter",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Custom Obsidian plugin for chio-developer-base. Promote daily-note 'What I learned' sections into Graphiti episode candidates.",
   "main": "main.js",
   "scripts": {

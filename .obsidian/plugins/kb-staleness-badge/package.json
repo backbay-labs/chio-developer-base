@@ -1,6 +1,6 @@
 {
   "name": "kb-staleness-badge",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Custom Obsidian plugin for chio-developer-base. Shows a staleness badge in the title bar based on the active note's `last-validated:` frontmatter.",
   "main": "main.js",
   "scripts": {

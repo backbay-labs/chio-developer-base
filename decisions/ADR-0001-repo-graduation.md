@@ -1,3 +1,17 @@
+---
+id: decisions.ADR-0001
+type: adr
+status: proposed
+date: 2026-05-07
+date-decision: TBD
+title: "Repo graduation: standalone vs. arc submodule"
+owners:
+  - "@connor"
+supersedes: []
+related:
+  - decisions.ADR-0000
+---
+
 # ADR-0001 — Repo graduation: standalone vs. arc submodule
 
 - **Status:** Proposed (decision deferred to Phase 4 review)

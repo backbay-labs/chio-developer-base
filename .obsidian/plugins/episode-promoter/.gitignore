@@ -5,7 +5,7 @@ main.js.map
 
 # npm
 node_modules/
-package-lock.json
+# package-lock.json IS committed — pins build dependencies for reproducible builds.
 
 # Per-vault user settings
 data.json

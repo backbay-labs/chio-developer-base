@@ -1,3 +1,17 @@
+---
+id: decisions.ADR-0002
+type: adr
+status: pending
+date: 2026-05-07
+date-accepted: TBD
+title: "Phase 0 outcome-eval baselines"
+owners:
+  - "@connor"
+supersedes: []
+related:
+  - decisions.ADR-0000
+---
+
 # ADR-0002 — Phase 0 outcome-eval baselines
 
 - **Status:** Pending baselines (Phase 0 incomplete)

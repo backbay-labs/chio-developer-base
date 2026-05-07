@@ -1,7 +1,7 @@
 {
   "id": "kb-staleness-badge",
   "name": "KB Staleness Badge",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "minAppVersion": "1.5.0",
   "description": "Show a green/yellow/orange/red badge in the active note's title bar based on `last-validated:` frontmatter. Thresholds: 30/90/180 days, matching the stale-specs dashboard and release-qualification playbook.",
   "author": "Backbay",

@@ -1,3 +1,14 @@
+---
+id: decisions.ADR-0000
+type: adr
+status: accepted
+date: 2026-05-07
+title: "Charter: chio-developer-base"
+owners:
+  - "@connor"
+supersedes: []
+---
+
 # ADR-0000 — Charter: chio-developer-base
 
 - **Status:** Accepted

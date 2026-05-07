@@ -1,7 +1,7 @@
 {
   "id": "episode-promoter",
   "name": "Episode Promoter",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "minAppVersion": "1.5.0",
   "description": "Promote a daily note's 'What I learned' section to a Graphiti episode candidate, with a confirmation modal showing the proposed frontmatter and body. Writes to vault/episodes/ — never to Graphiti directly.",
   "author": "Backbay",

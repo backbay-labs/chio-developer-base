@@ -39,3 +39,42 @@ The `## Implements` section in a spec note is the bridge from normative prose to
 - Link to symbols by stable identifier: `chio-core::cap::revoke` (crate path + symbol), not file path.
 - Link to conformance tests under `tests/conformance/` so the SDK suite is the executable proof.
 - The `kb_neighbors` MCP call inside the spec template is a live retrieval that surfaces structurally adjacent code; keep it as documentation that the spec is grounded.
+
+## All worked specs
+
+```dataview
+TABLE WITHOUT ID
+  file.link as Spec,
+  chio-node,
+  status,
+  crate,
+  last-validated
+FROM "vault/spec"
+WHERE type = "spec"
+SORT chio-node ASC
+```
+
+## By chio-node label
+
+```dataview
+TABLE WITHOUT ID
+  rows.file.link as Specs,
+  length(rows) as Count
+FROM "vault/spec"
+WHERE type = "spec"
+GROUP BY chio-node
+SORT chio-node ASC
+```
+
+## Stale specs (>90 days unvalidated)
+
+```dataview
+LIST file.link
+FROM "vault/spec"
+WHERE type = "spec"
+  AND status = "accepted"
+  AND (last-validated = null OR date(last-validated) < date(today) - dur(90 days))
+SORT last-validated ASC
+```
+
+> See [[../_meta/queries/stale-specs]] for the canonical org-wide stale dashboard, [[../_meta/queries/unowned-capabilities]] for unowned spec nodes, and individual spec note headers for per-note staleness via the [`kb-staleness-badge`](../../.obsidian/plugins/kb-staleness-badge/) plugin.
