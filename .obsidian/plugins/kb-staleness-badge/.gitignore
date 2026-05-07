@@ -1,0 +1,10 @@
+# Built artifact — produced by `npm run build`
+main.js
+main.js.map
+
+# npm
+node_modules/
+package-lock.json
+
+# Per-vault user settings
+data.json

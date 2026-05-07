@@ -48,6 +48,8 @@ kb-engine/uv.lock
 .obsidian/plugins/*/manifest.json
 !.obsidian/plugins/episode-promoter/manifest.json
 !.obsidian/plugins/episode-promoter/versions.json
+!.obsidian/plugins/kb-staleness-badge/manifest.json
+!.obsidian/plugins/kb-staleness-badge/versions.json
 
 # OS / Editor
 .DS_Store

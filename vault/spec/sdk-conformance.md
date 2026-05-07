@@ -1,0 +1,96 @@
+---
+id: spec.sdk.conformance
+type: spec
+status: accepted
+chio-node: Standard
+crate: chio-conformance
+supersedes: []
+related-specs:
+  - spec.receipt.commitment
+  - spec.guard.pipeline
+related-receipts:
+  - receipt.conformance
+related-guards: []
+graphiti-episode: episode.mcp-sdk-conformance
+related-diagrams: []
+owners:
+  - "@connor"
+last-validated: 2026-05-07
+---
+
+# SDK conformance
+
+What an external Chio SDK peer (Python, JS, future others) MUST implement to be declared compatible. The verdict matrix is the only authoritative source.
+
+## Normative
+
+> [!normative]
+> Every Chio SDK peer MUST pass every cell of `docs/conformance/verdict-matrix.md` before being declared compatible. A waived cell requires an ADR linking the waiver.
+
+> [!normative]
+> Conformance MUST cover both **wire-format roundtrips** (`transport_round_trip`) and **end-to-end behavior** (`conformance_suite`). Either alone is insufficient — wire-correct peers can still violate behavioral semantics, and behavior-correct peers can still emit malformed wire payloads under stress.
+
+> [!normative]
+> The conformance harness MUST run **identically across all peer languages**. Same fixtures, same expected outputs, same verdict thresholds. Per-language adaptation in the harness is forbidden — adaptation belongs in the peer's adapter code, not the test harness.
+
+> [!normative]
+> A protocol change that shifts any conformance verdict MUST update the verdict matrix and the cross-language tests in the same PR. Stale verdict matrices are a release blocker per [[../playbooks/release-qualification#gate-1--conformance-suite]].
+
+> [!normative]
+> Every conformance failure MUST emit `receipt.conformance.<peer>.<test-id>` recording: the peer language, the failing test, the kernel version, and the input fixture hash. Failures that don't receipt are forbidden — silent failures are how SDK divergence accumulates.
+
+## Why
+
+> [!receipt]
+> Conformance receipts are how external verifiers check whether a given peer is compatible at a given protocol version. Without receipts, "we ran the tests and they passed" is unfalsifiable.
+
+The decision to anchor conformance on the verdict matrix (rather than on per-peer test directories or on generated peer docs) is recorded in [[../episodes/mcp-sdk-conformance]] and reflects three constraints:
+
+1. **The verdict matrix is the only canonical source.** Generated peer outputs (test result dirs, language-specific READMEs, auto-doc bundles) are derivative. Mistaking generated output for canonical truth is how SDK divergence drifts in unnoticed.
+2. **Conformance is a wire-format contract, not a peer-implementation contract.** The same test case must pass identically regardless of language. If "Python passes but JS doesn't" is acceptable, the test isn't a conformance test — it's a per-peer regression.
+3. **Transport-level and behavioral coverage are both required.** Round-trip-only tests catch encoding bugs but miss behavioral drift. Behavior-only tests catch logic bugs but miss subtle wire mismatches that cause silent peer-to-peer failures. Either layer alone is insufficient.
+
+## Implements
+
+- `chio_mcp_adapter::lib` — `crates/chio-mcp-adapter/src/lib.rs` (adapter API)
+- `chio_mcp_adapter::transport` — `crates/chio-mcp-adapter/src/transport.rs` (wire format)
+- `chio_mcp_edge::runtime` — `crates/chio-mcp-edge/src/runtime.rs` (edge runtime)
+- `chio_conformance::verdict_matrix` — the matrix's source code
+- `docs/conformance/verdict-matrix.md` — the canonical matrix (markdown)
+- `tests/conformance/README.md` — peer-test layout
+
+## Tested by
+
+- `integrations/mcp-adapter/tests/transport_round_trip.rs` — round-trip
+- `integrations/mcp-adapter/tests/conformance_suite.rs` — full suite
+- `crates/chio-mcp-adapter/tests/integration_smoke.rs` — smoke
+- `crates/chio-conformance/verdict_matrix/tests/verdict_matrix_cross_language.rs` — cross-language verdict consistency
+- `tests/conformance/peers/python/` — Python peer tests
+- `tests/conformance/peers/js/` — JS peer tests
+
+When changing wire format, prefer `transport_round_trip` AND the cross-language tests over single-language unit tests — the cross-language tests are the only ones that catch peer-to-peer divergence.
+
+## Operations
+
+- [[../playbooks/release-qualification#gate-1--conformance-suite]] — release-time gate.
+
+## Open questions
+
+- [ ] **Adding a third peer.** When does a third SDK language (Rust SDK? Go?) become an in-scope adopter? Pending an ADR — the answer affects what "all peers" means in the verdict matrix.
+- [ ] **Test-coverage bias.** Do the conformance tests cover all kernel paths, or only the well-trodden ones? An unmeasured-but-suspected coverage gap. Pending a measurement (and possibly an outcome eval).
+- [ ] **Generated docs vs. authored docs.** Per the [`mcp-sdk-conformance`](../episodes/mcp-sdk-conformance) seed: generated result directories are NOT canonical sources but the line between "generated" and "authored" peer docs (e.g., a README that's partly autogenerated and partly hand-edited) is fuzzy. Open for an ADR if it bites.
+
+## Staleness
+
+> [!warning-staleness]
+> Last validated 2026-05-07. Re-validate against `docs/conformance/verdict-matrix.md`, `crates/chio-mcp-adapter/`, and `tests/conformance/peers/` whenever the wire schema bumps or a peer language is added.
+
+The [[../_meta/queries/stale-specs|stale-specs query]] flags this when `last-validated:` is 90+ days behind today.
+
+## Graph context
+
+%% kb_neighbors: spec.sdk.conformance depth=2 %%
+
+## Lineage
+
+Derived from the seed [[../episodes/mcp-sdk-conformance]] (migrated from arc PR #599's `seeds/graphiti/mcp-sdk-conformance.json` via `make kb-migrate-seeds`). The seed's three constraints translate into the three "Why" arguments here.
