@@ -1,0 +1,29 @@
+id: revocation-propagation-2026-05-07
+failing_test: "tests/conformance/native/scenarios/revocation-propagation.json#revocation-propagation"
+failure_message: |
+  FAILED  revocation-propagation (chio-wire-v1)
+    assertion `revocation_observed_within_window` expected: true, got: false
+    Fixture: revoked_capability
+    Driver: artifact
+    Reason: kernel exercise after revocation list version bump still allowed
+    (RVL version observed: 47, exercise time: revocation_window + 100ms)
+canonical_fix:
+  - file: "tests/conformance/native/scenarios/revocation-propagation.json"
+    section: "revocation_observed_within_window assertion"
+  - file: "crates/chio-kernel/src/revocation_store.rs"
+    section: "RVL writer / version bump"
+  - file: "crates/chio-kernel/src/kernel/delegation.rs"
+    section: "revoke / verify"
+  - file: "crates/chio-kernel-core/src/capability_verify.rs"
+    section: "consult_rvl"
+  - file: "crates/chio-revocation-oracle/tests/swarm_revocation_e2e.rs"
+    section: "propagation timing"
+relevant_arc_pr: "(scenario authored on origin/codex/chio-kb-a-grade-dogfood)"
+relevant_arc_commit: "(scenario fixture; not a single-commit fix)"
+commit_subject: "Conformance scenario: revocation propagates within the configured window"
+commit_date: "2026-05-07T00:00:00-04:00"
+notes: |
+  Hand-curated. Models the failure mode where a kernel exercises a
+  revoked capability past the revocation window. Cross-references the
+  revocation-oracle property test that exercises the same propagation
+  invariant. Pairs with [[../../vault/spec/capability-revocation]].

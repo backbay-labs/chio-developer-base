@@ -36,12 +36,42 @@ from pathlib import Path
 from typing import Any
 
 CONFORMANCE_PATHS = [
-    "tests/conformance/peers/python/",
-    "tests/conformance/peers/js/",
     "tests/conformance/",
+    "crates/chio-conformance/",
+    "integrations/mcp-adapter/tests/",
 ]
 
-TEST_FILE_RE = re.compile(r"(?:^|/)(?:test_[^/]+\.py|[^/]+\.test\.ts|[^/]+\.test\.js)$")
+# Files that count as "test" surfaces for the harvester's purposes.
+# Arc uses several conformance test idioms — pytest, jest, Rust integration,
+# JSON scenario fixtures, and peer client/server programs.
+TEST_FILE_RE = re.compile(
+    r"(?:^|/)(?:"
+    r"test_[^/]+\.py"               # pytest
+    r"|[^/]+\.test\.ts"             # jest TS
+    r"|[^/]+\.test\.js"             # jest JS
+    r"|conformance[^/]*\.rs"        # Rust integration tests like conformance_cli.rs
+    r")$"
+)
+
+# Additional test-surface predicates that need path-prefix awareness.
+def is_test_file(path: str) -> bool:
+    if TEST_FILE_RE.search(path):
+        return True
+    # JSON scenario fixtures count as tests
+    if path.startswith("tests/conformance/native/scenarios/") and path.endswith(".json"):
+        return True
+    # Rust integration tests under crates/.../tests/
+    if (
+        path.startswith("crates/")
+        and "/tests/" in path
+        and path.endswith(".rs")
+        and "conformance" in path.lower()
+    ):
+        return True
+    if path.startswith("integrations/mcp-adapter/tests/") and "conformance" in path.lower():
+        return True
+    return False
+
 
 SKIP_MARKER_RE = re.compile(
     r"(@pytest\.mark\.(?:skip|xfail)\b"
@@ -60,9 +90,9 @@ def git(args: list[str], repo: Path) -> str:
     return res.stdout
 
 
-def candidate_commits(repo: Path, search_limit: int) -> list[str]:
-    """Commit SHAs (newest first) that touched any conformance path."""
-    cmd = ["log", "--format=%H", "--no-merges", f"-n{search_limit}"]
+def candidate_commits(repo: Path, search_limit: int, branch: str) -> list[str]:
+    """Commit SHAs (newest first) on `branch` that touched any conformance path."""
+    cmd = ["log", branch, "--format=%H", "--no-merges", f"-n{search_limit}"]
     cmd.append("--")
     cmd.extend(CONFORMANCE_PATHS)
     out = git(cmd, repo).strip()
@@ -90,20 +120,20 @@ def diff_for_file(repo: Path, sha: str, path: str) -> str:
     return git(["show", "--format=", sha, "--", path], repo)
 
 
-def is_test_file(path: str) -> bool:
-    return path.startswith("tests/conformance/") and bool(TEST_FILE_RE.search(path))
-
-
 def looks_like_canonical_fix(path: str) -> bool:
     if path.startswith("tests/"):
         return False
-    if path.endswith((".lock", ".toml", ".yaml", ".yml")):
-        return False
+    if path.endswith((".lock", ".toml")):
+        return False  # build manifests rarely encode the fix
     return any(path.startswith(prefix) for prefix in (
         "crates/",
         "spec/",
         "docs/standards/",
         "docs/conformance/",
+        "docs/sdk/",
+        "docs/protocol/",
+        "docs/release/",
+        "docs/mcp/",
     ))
 
 
@@ -119,6 +149,23 @@ def extract_test_signatures(diff: str, file_path: str) -> list[str]:
             diff, re.MULTILINE,
         ):
             sigs.append(f"{file_path}:{m.group(1)}")
+    elif file_path.endswith(".rs"):
+        # Rust convention: test functions are conventionally named test_*.
+        # This misses Rust tests with non-conforming names but avoids
+        # capturing every Rust function in the diff.
+        for m in re.finditer(
+            r"^\+\s*(?:async\s+)?fn (test_[A-Za-z0-9_]+)\s*\(",
+            diff, re.MULTILINE,
+        ):
+            sigs.append(f"{file_path}::{m.group(1)}")
+    elif file_path.endswith(".json"):
+        # Scenario JSON files: signature is the file plus the scenario id
+        # if one is present in the added lines.
+        for m in re.finditer(r'^\+\s*"id"\s*:\s*"([^"]+)"', diff, re.MULTILINE):
+            sigs.append(f"{file_path}#{m.group(1)}")
+            break
+        if not sigs:
+            sigs.append(file_path)
     return sigs
 
 
@@ -180,10 +227,10 @@ def render_fixture_yaml(fixture: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def harvest(repo: Path, target: int, search_limit: int) -> list[dict[str, Any]]:
+def harvest(repo: Path, target: int, search_limit: int, branch: str) -> list[dict[str, Any]]:
     fixtures: list[dict[str, Any]] = []
     seen_signatures: set[str] = set()
-    commits = candidate_commits(repo, search_limit)
+    commits = candidate_commits(repo, search_limit, branch)
     for sha in commits:
         files = changed_files(repo, sha)
         test_files = [f for f in files if is_test_file(f)]
@@ -241,6 +288,7 @@ def main() -> int:
     p.add_argument("--out", required=True, help="output dir for fixture *.yml files")
     p.add_argument("--target", type=int, default=20, help="number of fixtures to emit")
     p.add_argument("--search-limit", type=int, default=400, help="max commits scanned")
+    p.add_argument("--branch", default="HEAD", help="branch (or ref) to walk; default HEAD")
     p.add_argument("--dry-run", action="store_true")
     args = p.parse_args()
 
@@ -249,7 +297,7 @@ def main() -> int:
         print(f"error: --arc-repo {repo} is not a git repo", file=sys.stderr)
         return 2
 
-    fixtures = harvest(repo, target=args.target, search_limit=args.search_limit)
+    fixtures = harvest(repo, target=args.target, search_limit=args.search_limit, branch=args.branch)
 
     if len(fixtures) < args.target:
         print(

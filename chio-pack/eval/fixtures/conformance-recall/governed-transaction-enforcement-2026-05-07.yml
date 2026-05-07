@@ -1,0 +1,28 @@
+id: governed-transaction-enforcement-2026-05-07
+failing_test: "tests/conformance/native/scenarios/governed-transaction-enforcement.json#governed-transaction-enforcement"
+failure_message: |
+  FAILED  governed-transaction-enforcement (chio-wire-v1)
+    assertion `transaction_blocked_by_guard` expected: true, got: false
+    Fixture: governed_transaction
+    Driver: artifact
+    Reason: transaction proceeded despite guard verdict `deny`
+    (guard.revocation-window returned deny; kernel evaluator did not short-circuit)
+canonical_fix:
+  - file: "tests/conformance/native/scenarios/governed-transaction-enforcement.json"
+    section: "transaction_blocked_by_guard assertion"
+  - file: "crates/chio-guards/src/pipeline.rs"
+    section: "short-circuit on first deny"
+  - file: "crates/chio-kernel/src/kernel/evaluator.rs"
+    section: "guard verdict handling"
+  - file: "crates/chio-policy/src/evaluate/engine.rs"
+    section: "policy → guards integration"
+  - file: "spec/PROTOCOL.md"
+    section: "Guard pipeline enforcement"
+relevant_arc_pr: "(scenario authored on origin/codex/chio-kb-a-grade-dogfood)"
+relevant_arc_commit: "(scenario fixture; not a single-commit fix)"
+commit_subject: "Conformance scenario: governed transaction blocked by deny verdict"
+commit_date: "2026-05-07T00:00:00-04:00"
+notes: |
+  Hand-curated. The most architecturally important fixture: a deny
+  verdict from the guard pipeline MUST short-circuit the transaction.
+  Pairs with [[../../vault/spec/guard-pipeline]] (the normative spec).
