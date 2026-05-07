@@ -1,0 +1,29 @@
+id: chio-deny-receipt-emitted-2026-05-07
+failing_test: "tests/conformance/scenarios/chio-extensions/deny-receipt-emitted.json#deny-receipt-emitted"
+failure_message: |
+  FAILED  chio-extensions/deny-receipt-emitted (specVersion 2026-03-19)
+    Expected: denied tool call emits `receipt.guard-verdict.<id>` with
+              verdict = "deny" and signed by the kernel
+    Got:      no receipt emitted (deny was silent)
+    Per spec.guard.pipeline, every guard verdict (regardless of outcome)
+    MUST emit receipt.guard-verdict — silent denials are forbidden.
+canonical_fix:
+  - file: "tests/conformance/scenarios/chio-extensions/deny-receipt-emitted.json"
+    section: "expected receipt emission"
+  - file: "crates/chio-guards/src/pipeline.rs"
+    section: "verdict receipt emission"
+  - file: "crates/chio-receipts/src/lib.rs"
+    section: "guard-verdict receipt construction"
+  - file: "spec/PROTOCOL.md"
+    section: "Deny receipts (chio-extension)"
+  - file: "docs/standards/CHIO_RECEIPTS_PROFILE.md"
+    section: "Verdict receipt obligation"
+relevant_arc_pr: "(scenario authored on origin/codex/chio-kb-a-grade-dogfood)"
+relevant_arc_commit: "(scenario fixture)"
+commit_subject: "Conformance scenario: denied actions emit signed deny receipts"
+commit_date: "2026-05-07T00:00:00-04:00"
+notes: |
+  Hand-curated. Tests the receipt-emission obligation that spec.guard.pipeline
+  treats as a normative MUST. Silent deny = covert channel. Pairs with
+  [[../../vault/spec/guard-pipeline]] (the normative spec) and
+  [[../../vault/spec/receipt-commitment]] (the receipt-format spec).

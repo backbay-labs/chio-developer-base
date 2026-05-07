@@ -1,0 +1,27 @@
+id: auth-unauthorized-challenge-2026-05-07
+failing_test: "tests/conformance/scenarios/auth/auth-unauthorized-challenge.json#auth-unauthorized-challenge"
+failure_message: |
+  FAILED  auth-unauthorized-challenge (specVersion 2025-11-25, streamable-http)
+    Expected: HTTP 401 with WWW-Authenticate: Bearer realm="...", resource_metadata="..."
+    Got:      HTTP 200 (unauthenticated initialize succeeded)
+    The server returned a successful initialize response to an
+    unauthenticated request — should have challenged with a
+    protected-resource metadata reference.
+canonical_fix:
+  - file: "tests/conformance/scenarios/auth/auth-unauthorized-challenge.json"
+    section: "expected pass criteria"
+  - file: "crates/chio-mcp-edge/src/runtime.rs"
+    section: "auth challenge handling"
+  - file: "crates/chio-mcp-adapter/src/transport.rs"
+    section: "WWW-Authenticate emission"
+  - file: "spec/PROTOCOL.md"
+    section: "Authorization challenge"
+relevant_arc_pr: "(scenario authored on origin/codex/chio-kb-a-grade-dogfood)"
+relevant_arc_commit: "(scenario fixture)"
+commit_subject: "Conformance scenario: unauthenticated initialize gets WWW-Authenticate challenge"
+commit_date: "2026-05-07T00:00:00-04:00"
+notes: |
+  Hand-curated. Auth challenge is the entry point to OAuth-style
+  protected-resource discovery. A server that fails closed (401 with
+  metadata reference) is the spec'd behavior; failing open (200) is the
+  fault mode the scenario catches.

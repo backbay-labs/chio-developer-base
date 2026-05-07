@@ -1,0 +1,30 @@
+id: auth-token-exchange-initialize-2026-05-07
+failing_test: "tests/conformance/scenarios/auth/auth-token-exchange-initialize.json#auth-token-exchange-initialize"
+failure_message: |
+  FAILED  auth-token-exchange-initialize (RFC 8693)
+    Expected: token exchange request → response with new access token
+              bound to the requested resource scope
+    Got:      response token has scope "*" instead of the requested
+              narrow scope `chio:tool:database_read`
+    The token endpoint over-granted scope. Per RFC 8693, the issued
+    token MUST NOT have wider scope than was requested AND wider than
+    the original token's scope. Both bounds were violated.
+canonical_fix:
+  - file: "tests/conformance/scenarios/auth/auth-token-exchange-initialize.json"
+    section: "expected response scope"
+  - file: "crates/chio-mcp-adapter/src/transport.rs"
+    section: "token exchange handling"
+  - file: "crates/chio-core-types/src/capability.rs"
+    section: "scope narrowing"
+  - file: "spec/PROTOCOL.md"
+    section: "RFC 8693 token exchange"
+relevant_arc_pr: "(scenario authored on origin/codex/chio-kb-a-grade-dogfood)"
+relevant_arc_commit: "(scenario fixture)"
+commit_subject: "Conformance scenario: token exchange narrows scope correctly"
+commit_date: "2026-05-07T00:00:00-04:00"
+notes: |
+  Hand-curated. RFC 8693 token exchange is a security-critical MCP
+  surface — over-granting scope here is a privilege-escalation bug.
+  Pairs with capability-scope-related vault content. The agent must
+  recognize that "scope: *" in a response is NEVER correct for a
+  narrowing exchange.

@@ -1,0 +1,31 @@
+id: tasks-call-get-result-2026-05-07
+failing_test: "tests/conformance/scenarios/tasks/tasks-call-get-result.json#tasks-call-get-result"
+failure_message: |
+  FAILED  tasks/tasks-call-get-result (specVersion 2025-11-25, mcp-experimental)
+    Expected: tasks/call returns task_id; tasks/get returns Status::Running
+              while task is in flight; tasks/result returns final value
+              when status transitions to Status::Done
+    Got:      tasks/get returned Status::Done before task actually finished
+    Server returning premature Done status — likely a race between the
+    task scheduler and the status query. The conformance harness uses
+    deterministic fixtures so this isn't a flake.
+canonical_fix:
+  - file: "tests/conformance/scenarios/tasks/tasks-call-get-result.json"
+    section: "expected tasks/get progress"
+  - file: "crates/chio-mcp-adapter/src/lib.rs"
+    section: "tasks/* surface"
+  - file: "crates/chio-mcp-edge/src/runtime.rs"
+    section: "task scheduler"
+  - file: "spec/PROTOCOL.md"
+    section: "Tasks (experimental)"
+relevant_arc_pr: "(scenario authored on origin/codex/chio-kb-a-grade-dogfood)"
+relevant_arc_commit: "(scenario fixture)"
+commit_subject: "Conformance scenario: tasks/* lifecycle (call → get → result)"
+commit_date: "2026-05-07T00:00:00-04:00"
+notes: |
+  Hand-curated. Tests the experimental tasks/* MCP surface. Premature
+  Done is one of the harder failure modes to debug because the
+  expected and actual responses are both well-formed JSON — only the
+  ordering and timing distinguish correct from incorrect. Tests
+  retrieval's ability to surface the scheduler code, not just the
+  surface-level RPC handler.

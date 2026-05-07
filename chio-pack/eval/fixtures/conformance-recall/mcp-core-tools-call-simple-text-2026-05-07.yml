@@ -1,0 +1,29 @@
+id: mcp-core-tools-call-simple-text-2026-05-07
+failing_test: "tests/conformance/scenarios/mcp_core/tools-call-simple-text.json#tools-call-simple-text"
+failure_message: |
+  FAILED  mcp-core/tools-call-simple-text (specVersion 2025-11-25)
+    Expected: tool call returns CallToolResult with content[0].type = "text"
+              and content[0].text = "<canonical response>"
+    Got:      CallToolResult.content[0].type = "image"
+    The server returned a non-text content type for a tool whose
+    fixture defines text output. Likely a content-type negotiation bug
+    OR the server is returning the wrong content for this tool.
+canonical_fix:
+  - file: "tests/conformance/scenarios/mcp_core/tools-call-simple-text.json"
+    section: "expected content[0] shape"
+  - file: "crates/chio-mcp-adapter/src/lib.rs"
+    section: "CallToolResult marshaling"
+  - file: "tests/conformance/peers/python/server.py"
+    section: "test tool implementation"
+  - file: "tests/conformance/peers/js/server.mjs"
+    section: "test tool implementation"
+relevant_arc_pr: "(scenario authored on origin/codex/chio-kb-a-grade-dogfood)"
+relevant_arc_commit: "(scenario fixture)"
+commit_subject: "Conformance scenario: tool returns simple text result"
+commit_date: "2026-05-07T00:00:00-04:00"
+notes: |
+  Hand-curated. Simple-text tool calls are the conformance baseline for
+  the tools/* MCP surface. Failure here often points at a peer
+  implementation bug (server returning wrong content) more than an
+  adapter bug — tests the agent's ability to navigate the peer dirs
+  vs the adapter dirs.

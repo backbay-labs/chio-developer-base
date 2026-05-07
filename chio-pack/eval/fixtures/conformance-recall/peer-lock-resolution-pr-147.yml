@@ -1,0 +1,32 @@
+id: peer-lock-resolution-pr-147
+failing_test: "crates/chio-cli/tests/conformance_cli.rs::test_peer_lock_resolves_at_runtime"
+failure_message: |
+  FAILED  test_peer_lock_resolves_at_runtime
+    Expected: chio conformance run --peer python loads
+              tests/conformance/peers/python/peers.lock.toml at runtime
+    Got:      "Error: peer 'python' not registered (compile-time
+             registry built without peers.lock.toml)"
+    The conformance CLI was building its peer registry at COMPILE time
+    from the workspace layout, not resolving peers.lock.toml at runtime.
+    A user with a custom peer set can't extend the registry without
+    rebuilding the binary.
+canonical_fix:
+  - file: "crates/chio-cli/tests/conformance_cli.rs"
+    section: "test_peer_lock_resolves_at_runtime"
+  - file: "crates/chio-cli/src/conformance/mod.rs"
+    section: "peer registry construction"
+  - file: "tests/conformance/peers/python/peers.lock.toml"
+    section: "lock file format"
+  - file: "docs/conformance/verdict-matrix.md"
+    section: "Peer registration"
+relevant_arc_pr: "https://github.com/bb-connor/arc/pull/147"
+relevant_arc_commit: "(arc PR #147: fix(conformance): correct crate package layout, runtime peer-lock resolution, and CLI argument validation)"
+commit_subject: "fix(conformance): correct crate package layout, runtime peer-lock resolution, and CLI argument validation"
+commit_date: "(see arc PR #147)"
+notes: |
+  Curated from arc PR #147 metadata. The PR's title is multi-part — this
+  fixture targets the **runtime peer-lock resolution** sub-fix
+  specifically (crate-layout and CLI-arg sub-fixes are out of scope as
+  conformance-recall fixtures since they're packaging concerns, not
+  protocol behavior). Tests retrieval's ability to surface both the
+  CLI test, the registry construction site, and the lock file format.
