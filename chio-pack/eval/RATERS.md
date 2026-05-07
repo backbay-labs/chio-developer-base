@@ -10,15 +10,25 @@ The `capability-error-explanation` eval requires exactly three raters per scenar
 
 | Rater | Pseudonym | Role | Joined | Calibration last passed |
 | ----- | --------- | ---- | ------ | ----------------------- |
-| @connor | rater-A | Chio author | 2026-05-07 | TBD |
-| TBD | rater-B | TBD | TBD | TBD |
-| TBD | rater-C | TBD | TBD | TBD |
+| @connor | rater-A | Chio author / maintainer | 2026-05-07 | TBD (Run-0 pending) |
+| TBD | rater-B | Pending: Chio-familiar engineer (target: 1 internal Backbay engineer) | TBD | — |
+| TBD | rater-C | Pending: external rater OR LLM-judge fallback (see "Solo-maintainer fallback" below) | TBD | — |
 
 A fourth (alternate) is named for tiebreak when the disagreement flag fires (`max - min > 1` on any dimension).
 
 | Alternate | Pseudonym | Joined | Available |
 | --------- | --------- | ------ | --------- |
 | TBD | rater-D | TBD | flagged-rerate only |
+
+## Solo-maintainer fallback (Phase 0 reality)
+
+The original PHASE-0.md spec assumed three named human raters at Phase 0 baseline time. As of v0.0.1-vault-complete the maintainer pool is **single-human** (@connor). Two paths to unblock:
+
+1. **Recruit two humans.** Identify two Chio-familiar engineers (one internal, one external if open-source community grows) who can commit to ~30 minutes per eval run, ~4 runs in the first six months. Preferred path. RATERS.md table fills in; Run-0 calibration proceeds normally.
+
+2. **LLM-judge fallback.** Document an explicit Phase-0-only configuration where rater-B and rater-C are LLM judges using **distinct prompt strategies** (e.g., rater-B = Claude Sonnet 4.6 with the rubric verbatim; rater-C = Claude Haiku 4.5 with a rubric variant emphasizing accuracy). Disagreement-flag rate becomes the sanity check rather than human-vs-human variance. **Costs:** rubric drift goes undetected if both LLMs share blind spots; subjective dimensions (clarity especially) drift toward LLM stylistic preferences. **Mitigation:** rater-A (human) catches LLM-stylistic bias by re-rating any flagged scenario.
+
+The current state is "**Path 1 preferred, Path 2 documented.**" An ADR (proposed `ADR-0004-rater-pool`) should record which path the project commits to before ADR-0002 sign-off.
 
 ## Pseudonymization rule
 

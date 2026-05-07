@@ -1,0 +1,49 @@
+id: cross-issuer-revocation-attempt
+source: "Drafted from spec.capability.revocation Open Questions"
+
+scenario: |
+  Operator (issuer C) attempts to revoke a capability minted by issuer A
+  and delegated to grantee B. Kernel returns:
+
+      CrossIssuerRevocation: revocation rejected — capability was minted
+      by did:chio:issuer:A, but the revocation request is signed by
+      did:chio:issuer:C (no trust-graph entry authorizes C-revokes-A)
+
+context_query: "CrossIssuerRevocation revocation rejected trust-graph"
+
+augmentations_under_test:
+  - name: raw
+    body: "CrossIssuerRevocation: revocation rejected — capability was minted by did:chio:issuer:A, but the revocation request is signed by did:chio:issuer:C (no trust-graph entry authorizes C-revokes-A)"
+
+  - name: kb_brief_feature
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "cross-issuer revocation"
+        focus_paths:
+          - "crates/chio-kernel/src/kernel/delegation.rs"
+          - "crates/chio-kernel/src/revocation_store.rs"
+
+  - name: kb_brief_feature + signed_receipt
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "cross-issuer revocation"
+        include_signed_receipt: true
+
+  - name: kb_brief_feature + episode_link
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "cross-issuer revocation"
+        include_episode_link: "episode.capability-revocation-architecture"
+
+rubric_overrides: {}
+
+notes: |
+  Cross-issuer revocation is documented as NOT SUPPORTED in v1 (per
+  spec.capability.revocation Open Questions). The operator's error is
+  procedural, not a system bug. Raters should reward augmentations that
+  surface the "Open question" status clearly — actionability is "ask
+  issuer A to revoke; or, if A is unreachable, file an ADR for the
+  trust-graph extension."

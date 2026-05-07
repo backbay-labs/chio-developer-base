@@ -1,0 +1,51 @@
+id: revoked-cap-still-presented
+source: "Drafted from spec.capability.revocation"
+
+scenario: |
+  Agent presents a delegated capability that was revoked 2 minutes ago.
+  Kernel returns:
+
+      RevocationCheck: capability rejected (revocation list version 47)
+
+  Agent has no prior context about this capability's revocation status.
+
+context_query: "RevocationCheck capability rejected revocation list"
+
+augmentations_under_test:
+  - name: raw
+    body: "RevocationCheck: capability rejected (revocation list version 47)"
+
+  - name: kb_brief_feature
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability revocation"
+        focus_paths:
+          - "crates/chio-kernel/src/kernel/delegation.rs"
+          - "crates/chio-kernel/src/revocation_store.rs"
+
+  - name: kb_brief_feature + signed_receipt
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability revocation"
+        focus_paths:
+          - "crates/chio-kernel/src/kernel/delegation.rs"
+        include_signed_receipt: true
+
+  - name: kb_brief_feature + episode_link
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability revocation"
+        focus_paths:
+          - "crates/chio-kernel/src/kernel/delegation.rs"
+        include_episode_link: "episode.capability-revocation-architecture"
+
+rubric_overrides: {}
+
+notes: |
+  The canonical "what does revocation rejection look like" scenario.
+  Tests whether retrieval pulls in the spec/playbook/episode triple
+  for revocation. Raters should reach a 4+ on actionability when
+  augmentation includes the playbook link.

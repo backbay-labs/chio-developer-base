@@ -1,0 +1,46 @@
+id: dpop-proof-htu-mismatch
+source: "Drafted from conformance scenario dpop-verification + spec.protocol"
+
+scenario: |
+  Agent presents a capability bound via DPoP, but the proof's `htu`
+  claim doesn't match the request URL. Kernel returns:
+
+      DPoPBindingMismatch: proof.htu `https://api.example/x` does not
+      match request URL `https://api.example/y`
+
+context_query: "DPoPBindingMismatch proof htu does not match request URL"
+
+augmentations_under_test:
+  - name: raw
+    body: "DPoPBindingMismatch: proof.htu `https://api.example/x` does not match request URL `https://api.example/y`"
+
+  - name: kb_brief_feature
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "DPoP proof binding"
+        focus_paths:
+          - "crates/chio-kernel/src/kernel/mod.rs"
+          - "crates/chio-core-types/src/capability.rs"
+
+  - name: kb_brief_feature + signed_receipt
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "DPoP proof binding"
+        include_signed_receipt: true
+
+  - name: kb_brief_feature + episode_link
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "DPoP proof binding"
+        include_episode_link: "episode.chio-architecture-summary"
+
+rubric_overrides: {}
+
+notes: |
+  DPoP (RFC 9449) binding failure. Common newcomer confusion: thinking
+  the cap is broken when really the proof is bound to a different
+  request. Raters should reward augmentations that explain "proofs are
+  per-request, regenerate for the new URL" (actionability 5).

@@ -1,0 +1,50 @@
+id: concurrent-revocation-race
+source: "Drafted from spec.capability.revocation + crates/chio-revocation-oracle/tests/property_oracle.rs"
+
+scenario: |
+  Agent presents a capability that was revoked 200ms ago. The kernel's
+  RVL had not yet propagated to this verifier replica. Kernel returns:
+
+      RevocationStaleness: capability revoked at 2026-05-07T18:25:00.000Z,
+      but RVL replica observed it as live at 2026-05-07T18:25:00.200Z
+      (replica RVL version: 47; current authoritative version: 48)
+
+context_query: "RevocationStaleness RVL replica version propagation"
+
+augmentations_under_test:
+  - name: raw
+    body: "RevocationStaleness: capability revoked at 2026-05-07T18:25:00.000Z, but RVL replica observed it as live at 2026-05-07T18:25:00.200Z (replica RVL version: 47; current authoritative version: 48)"
+
+  - name: kb_brief_feature
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "RVL propagation"
+        focus_paths:
+          - "crates/chio-kernel/src/revocation_store.rs"
+          - "crates/chio-revocation-oracle/tests/property_oracle.rs"
+
+  - name: kb_brief_feature + signed_receipt
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "RVL propagation"
+        include_signed_receipt: true
+
+  - name: kb_brief_feature + episode_link
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "RVL propagation"
+        include_episode_link: "episode.capability-revocation-architecture"
+
+rubric_overrides: {}
+
+notes: |
+  Edge-case race condition during RVL propagation. The capability IS
+  revoked (authoritative truth: version 48) but the verifying replica
+  is one version behind. Per spec.capability.revocation, the kernel
+  should fail-closed under partition. Tests retrieval's ability to
+  surface the property test (`property_oracle.rs`) which exercises
+  this exact race. The fix isn't application-level — it's RVL
+  propagation tightening or fail-closed-on-stale.

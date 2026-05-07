@@ -1,0 +1,48 @@
+id: capability-wrong-audience
+source: "Drafted from spec.protocol.wire-format + spec.sdk.conformance"
+
+scenario: |
+  Agent presents a capability whose `aud` claim is `did:chio:tool:a`
+  but the request is going to `did:chio:tool:b`. Kernel returns:
+
+      AudienceMismatch: capability `aud` did:chio:tool:a does not match
+      target did:chio:tool:b
+
+context_query: "AudienceMismatch capability aud does not match target"
+
+augmentations_under_test:
+  - name: raw
+    body: "AudienceMismatch: capability `aud` did:chio:tool:a does not match target did:chio:tool:b"
+
+  - name: kb_brief_feature
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability audience binding"
+        focus_paths:
+          - "crates/chio-core-types/src/capability.rs"
+          - "spec/PROTOCOL.md"
+
+  - name: kb_brief_feature + signed_receipt
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability audience binding"
+        include_signed_receipt: true
+
+  - name: kb_brief_feature + episode_link
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability audience binding"
+        include_episode_link: "episode.chio-architecture-summary"
+
+rubric_overrides: {}
+
+notes: |
+  `aud` mismatch is a confusing failure mode for newcomers — the
+  capability is "valid" but bound to a different target. Raters should
+  reward augmentations that explain the binding contract (clarity 5)
+  and point at the spec where audience-binding is normative
+  (accuracy 5). The fix is not to retry — it's to request a capability
+  bound to the correct target.

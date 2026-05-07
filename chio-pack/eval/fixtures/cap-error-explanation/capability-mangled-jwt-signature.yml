@@ -1,0 +1,47 @@
+id: capability-mangled-jwt-signature
+source: "Drafted from spec.protocol.wire-format + arc tests/conformance/native/scenarios/capability-validation.json"
+
+scenario: |
+  Agent presents a capability JWT whose signature segment is
+  base64url-corrupted. Kernel returns:
+
+      CapabilitySignature: signature verification failed — base64url
+      decode error at byte 247 (expected `-`/`_`/`A-Za-z0-9`, found `+`)
+
+context_query: "CapabilitySignature signature verification failed base64url"
+
+augmentations_under_test:
+  - name: raw
+    body: "CapabilitySignature: signature verification failed — base64url decode error at byte 247 (expected `-`/`_`/`A-Za-z0-9`, found `+`)"
+
+  - name: kb_brief_feature
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability JWT signature decoding"
+        focus_paths:
+          - "crates/chio-core-types/src/capability.rs"
+          - "crates/chio-kernel-core/src/capability_verify.rs"
+
+  - name: kb_brief_feature + signed_receipt
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability JWT signature decoding"
+        include_signed_receipt: true
+
+  - name: kb_brief_feature + episode_link
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability JWT signature decoding"
+        include_episode_link: "episode.chio-architecture-summary"
+
+rubric_overrides: {}
+
+notes: |
+  Common transport-corruption case: a `+` somewhere in the signature
+  means standard base64 was used somewhere instead of base64url. The
+  fix is at the transport layer (re-fetch the cap, fix the encoder),
+  not at the kernel. Raters should reward augmentations that surface
+  the wire-format encoding contract (base64url, not base64).

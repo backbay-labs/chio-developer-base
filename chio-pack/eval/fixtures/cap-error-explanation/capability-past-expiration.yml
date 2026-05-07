@@ -1,0 +1,47 @@
+id: capability-past-expiration
+source: "Drafted from spec.capability.revocation"
+
+scenario: |
+  Agent presents a capability whose `exp` claim was 30 seconds ago.
+  Kernel returns:
+
+      CapabilityExpiry: capability expired at 2026-05-07T18:24:30Z
+      (current time: 2026-05-07T18:25:00Z, drift_window: 5s)
+
+context_query: "CapabilityExpiry capability expired drift window"
+
+augmentations_under_test:
+  - name: raw
+    body: "CapabilityExpiry: capability expired at 2026-05-07T18:24:30Z (current time: 2026-05-07T18:25:00Z, drift_window: 5s)"
+
+  - name: kb_brief_feature
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability expiration drift window"
+        focus_paths:
+          - "crates/chio-core-types/src/capability.rs"
+          - "crates/chio-kernel-core/src/capability_verify.rs"
+
+  - name: kb_brief_feature + signed_receipt
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability expiration drift window"
+        include_signed_receipt: true
+
+  - name: kb_brief_feature + episode_link
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability expiration drift window"
+        include_episode_link: "episode.capability-revocation-architecture"
+
+rubric_overrides: {}
+
+notes: |
+  Expiry-vs-revocation distinction. Both reject, but the right next step
+  differs: expired → mint a fresh capability (cheap, no policy change);
+  revoked → understand why it was revoked (could be compromise or policy
+  shift). Raters should score actionability higher when augmentations
+  surface the mint-renewal path.

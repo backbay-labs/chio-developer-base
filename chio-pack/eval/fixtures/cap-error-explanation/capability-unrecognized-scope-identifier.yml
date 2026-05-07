@@ -1,0 +1,47 @@
+id: capability-unrecognized-scope-identifier
+source: "Drafted from spec.protocol.wire-format"
+
+scenario: |
+  Agent presents a capability granting scope
+  `chio:tool:database_write/v3:json`. Kernel returns:
+
+      UnknownScope: scope identifier `chio:tool:database_write/v3:json`
+      not in registered scope vocabulary (last sync: 2026-05-07T16:00:00Z)
+
+context_query: "UnknownScope scope identifier registered vocabulary"
+
+augmentations_under_test:
+  - name: raw
+    body: "UnknownScope: scope identifier `chio:tool:database_write/v3:json` not in registered scope vocabulary (last sync: 2026-05-07T16:00:00Z)"
+
+  - name: kb_brief_feature
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "scope vocabulary registration"
+        focus_paths:
+          - "crates/chio-core-types/src/capability.rs"
+          - "spec/schemas/chio-wire/v1/"
+
+  - name: kb_brief_feature + signed_receipt
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "scope vocabulary registration"
+        include_signed_receipt: true
+
+  - name: kb_brief_feature + episode_link
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "scope vocabulary registration"
+        include_episode_link: "episode.kb-upgrade-decision"
+
+rubric_overrides: {}
+
+notes: |
+  The unknown-scope case is a vocabulary-versioning issue: the
+  capability cites a `/v3:json` scope that the kernel doesn't recognize.
+  Could be a fresh-from-issuer cap that the kernel hasn't synced yet,
+  OR a typo, OR an `x-`-style vendor extension that wasn't prefixed.
+  The fix path varies — tests retrieval's ability to disambiguate.

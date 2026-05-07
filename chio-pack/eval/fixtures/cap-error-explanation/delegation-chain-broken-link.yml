@@ -1,0 +1,48 @@
+id: delegation-chain-broken-link
+source: "Drafted from spec.capability.revocation + arc PR #591 (attenuation_proof unbinding)"
+
+scenario: |
+  Agent presents a delegated capability. Kernel can verify the leaf
+  signature (the immediate delegate) but the parent signature in the
+  delegation chain doesn't verify. Kernel returns:
+
+      DelegationChain: parent signature invalid at depth 2 of 3
+      (parent_kid: did:chio:peer:b3a2..., signature: malformed_pkcs7)
+
+context_query: "DelegationChain parent signature invalid depth"
+
+augmentations_under_test:
+  - name: raw
+    body: "DelegationChain: parent signature invalid at depth 2 of 3 (parent_kid: did:chio:peer:b3a2..., signature: malformed_pkcs7)"
+
+  - name: kb_brief_feature
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "delegation chain verification"
+        focus_paths:
+          - "crates/chio-kernel/src/kernel/delegation.rs"
+          - "crates/chio-kernel-core/src/capability_verify.rs"
+
+  - name: kb_brief_feature + signed_receipt
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "delegation chain verification"
+        include_signed_receipt: true
+
+  - name: kb_brief_feature + episode_link
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "delegation chain verification"
+        include_episode_link: "episode.capability-revocation-architecture"
+
+rubric_overrides: {}
+
+notes: |
+  Mid-chain corruption case. Tests whether retrieval surfaces the
+  attenuation-proof spec (where chain verification is normative) and
+  the delegation_chain_valid conformance assertion. Tied to arc PR #591
+  (the P0 attenuation_proof unbinding fix). Actionable next: ask the
+  parent issuer to re-sign with a non-malformed PKCS7 envelope.

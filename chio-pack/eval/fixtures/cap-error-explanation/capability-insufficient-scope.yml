@@ -1,0 +1,50 @@
+id: capability-insufficient-scope
+source: "Drafted from spec.capability.revocation + spec.guard.pipeline"
+
+scenario: |
+  Agent presents a valid capability for a tool action, but the requested
+  action falls outside the capability's scope. Kernel returns:
+
+      CapabilityScope: requested action `database_write` not in granted
+      scopes [`database_read`, `cache_read`]
+
+context_query: "CapabilityScope requested action not in granted scopes"
+
+augmentations_under_test:
+  - name: raw
+    body: "CapabilityScope: requested action `database_write` not in granted scopes [`database_read`, `cache_read`]"
+
+  - name: kb_brief_feature
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability scope enforcement"
+        focus_paths:
+          - "crates/chio-core-types/src/capability.rs"
+          - "crates/chio-kernel-core/src/capability_verify.rs"
+
+  - name: kb_brief_feature + signed_receipt
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability scope enforcement"
+        focus_paths:
+          - "crates/chio-core-types/src/capability.rs"
+        include_signed_receipt: true
+
+  - name: kb_brief_feature + episode_link
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability scope enforcement"
+        focus_paths:
+          - "crates/chio-core-types/src/capability.rs"
+        include_episode_link: "episode.chio-architecture-summary"
+
+rubric_overrides: {}
+
+notes: |
+  Common scope-mismatch — the agent has a capability but used it for
+  the wrong action. Distinguishes from revocation (cap is still valid).
+  Actionable next step: request a wider-scope cap from the issuer
+  (with a justification), or refactor the action to fit existing scopes.
