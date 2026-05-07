@@ -1,0 +1,48 @@
+# CODEOWNERS — auto-request reviewers on PRs touching specific paths.
+#
+# Format:    <pattern>     <reviewer1> [reviewer2 ...]
+# Last-matching pattern per file wins.
+# Patterns use gitignore-style globs (with leading slash anchoring to repo root).
+#
+# Docs: https://docs.github.com/en/repositories/managing-your-repositories-settings-and-customizations/customizing-your-repository/about-code-owners
+
+# === Load-bearing top-level docs ===
+# Anything that defines the project's contract.
+/PLAN.md            @bb-connor
+/AGENTS.md          @bb-connor
+/CLAUDE.md          @bb-connor
+/CONTRIBUTING.md    @bb-connor
+/README.md          @bb-connor
+/LICENSE            @bb-connor
+
+# === ADRs — every decision deserves review ===
+/decisions/         @bb-connor
+
+# === Eval surface — outcome targets, rubrics, raters, runner ===
+# Changing what "the carve-out works" means is an ADR-level decision.
+/chio-pack/eval/                    @bb-connor
+/chio-pack/chio_pack/eval/          @bb-connor
+
+# === Engine ↔ pack boundary ===
+# kb-engine cannot import chio_*. The boundary is enforced by CI (Phase 1+).
+# Changes to either side require explicit review.
+/kb-engine/                         @bb-connor
+/chio-pack/pyproject.toml           @bb-connor
+/chio-pack/chio_pack/__init__.py    @bb-connor
+
+# === CI / repo plumbing ===
+/.github/                           @bb-connor
+/Makefile                           @bb-connor
+/.gitignore                         @bb-connor
+
+# === Phase 2 surfaces (placeholders today; moonshot deliverables) ===
+/chio-pr-gate/                      @bb-connor
+
+# === Infrastructure config ===
+/infra/                             @bb-connor
+/.env.example                       @bb-connor
+
+# Note: most vault content (spec/, episodes/, playbooks/, daily/, _meta/queries/)
+# is intentionally NOT in CODEOWNERS. Vault content evolves rapidly and
+# auto-requesting review on every typo fix is noise. Reviewers will be
+# tagged manually when material vault changes are proposed.
