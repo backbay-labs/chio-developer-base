@@ -1,0 +1,35 @@
+id: threat-coverage-pin-2026-05-07
+failing_test: "crates/chio-conformance/tests/threat_coverage.rs::test_threat_coverage_pin"
+failure_message: |
+  FAILED  test_threat_coverage_pin
+    Threat-coverage pin assertion below floor:
+      Pinned coverage:   42/45 threats covered (93.3%)
+      Current coverage:  39/45 threats covered (86.7%)
+      Floor:             45/45 (100% — every pinned threat has a
+                          conformance scenario asserting it)
+    Three threats lost their conformance coverage:
+      - T-014 (capability scope inflation)
+      - T-022 (delegation chain forgery)
+      - T-031 (receipt root collision)
+canonical_fix:
+  - file: "crates/chio-conformance/tests/threat_coverage.rs"
+    section: "test_threat_coverage_pin"
+  - file: "crates/chio-conformance/src/threat_pins.rs"
+    section: "T-014, T-022, T-031 pin definitions"
+  - file: "tests/conformance/native/scenarios/"
+    section: "scenarios for the missing threats"
+  - file: "spec/THREAT_MODEL.md"
+    section: "T-014/T-022/T-031 threat definitions"
+  - file: "docs/conformance/threat-coverage.md"
+    section: "coverage matrix"
+relevant_arc_pr: "https://github.com/bb-connor/arc/pull/548"
+relevant_arc_commit: "(arc PR #548: tighten threat-coverage pin assertions)"
+commit_subject: "test(chio-conformance): tighten threat-coverage pin assertions"
+commit_date: "(see arc PR #548)"
+notes: |
+  Hand-curated based on the title of arc PR #548 ("tighten threat-coverage
+  pin assertions"). The pin-test pattern: lock in that every threat in
+  spec/THREAT_MODEL.md has at least one conformance scenario covering it.
+  Tightening the pin (the PR's stated work) catches regressions where a
+  threat slipped out of coverage. Failure mode shown: three threats
+  lost coverage, dropping below the 100% floor.

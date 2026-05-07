@@ -1,0 +1,30 @@
+id: verdict-matrix-wasm-synthesis-2026-04-30
+failing_test: "sdks/typescript/packages/conformance/test/verdict_matrix.test.ts:reports scenarios as unsupported without a live sidecar"
+failure_message: |
+  FAIL  sdks/typescript/packages/conformance/test/verdict_matrix.test.ts
+    > reports scenarios as unsupported without a live sidecar
+    Expected: { verdict: "unsupported", reason: "sidecar unreachable" }
+    Got:      { verdict: "allow", reason: null }
+    The TS/WASM driver synthesized a verdict locally instead of marking
+    the scenario unsupported when the sidecar was unreachable.
+canonical_fix:
+  - file: "crates/chio-conformance/verdict_matrix/drivers/typescript/run_scenarios.ts"
+    section: "sidecar unreachable handling"
+  - file: "crates/chio-conformance/verdict_matrix/drivers/wasm-browser/run.sh"
+    section: "synthesis-mode disable"
+  - file: "crates/chio-kernel-browser/tests/verdict_matrix_wasm.rs"
+    section: "expected unsupported state"
+  - file: "docs/conformance/verdict-matrix.md"
+    section: "Driver behavior when sidecar unreachable"
+relevant_arc_pr: "(harvested from arc commit 1f8935589a)"
+relevant_arc_commit: "1f8935589ac84cd761f7dbc3060fc9a88eb2970c"
+commit_subject: "fix(conformance): stop synthesizing ts wasm verdicts"
+commit_date: "2026-04-30T11:11:20-04:00"
+notes: |
+  Curated from harvester output. The original commit message was the
+  "fix" — the harvester correctly identified this as a focused fix
+  (not a feat/refactor). Replaced placeholder failure_message with
+  a plausible Vitest output showing the synthesized "allow" instead
+  of the expected "unsupported" state. Per the verdict-matrix
+  contract, drivers MUST report scenarios as unsupported when the
+  underlying transport can't be exercised — not synthesize fake passes.

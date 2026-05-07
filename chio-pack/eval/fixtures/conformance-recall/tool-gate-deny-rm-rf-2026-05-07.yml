@@ -1,0 +1,29 @@
+id: tool-gate-deny-rm-rf-2026-05-07
+failing_test: "tests/conformance/fixtures/guard/tool-gate.yaml#deny_rm_rf"
+failure_message: |
+  FAILED  tool-gate / deny_rm_rf (Rust guard)
+    Expected verdict: deny (reason: "blocked by policy")
+    Got verdict:      allow
+    Request: { tool_name: "rm_rf" }
+    The tool-gate deny-list (dangerous_tool, rm_rf, drop_database) did
+    not match. Likely a normalization or comparison bug — the Python
+    and Go guards correctly denied this request in the same run.
+canonical_fix:
+  - file: "tests/conformance/fixtures/guard/tool-gate.yaml"
+    section: "deny_rm_rf fixture"
+  - file: "crates/chio-cli/src/guard.rs"
+    section: "TestFixture shape"
+  - file: "crates/chio-guards/src/tool_gate.rs"
+    section: "deny-list comparison"
+  - file: "crates/chio-guards/src/lib.rs"
+    section: "Guard trait"
+relevant_arc_pr: "(scenario authored on origin/codex/chio-kb-a-grade-dogfood)"
+relevant_arc_commit: "(guard fixture; not a single-commit fix)"
+commit_subject: "Conformance fixture: tool-gate denies rm_rf across all four guard languages"
+commit_date: "2026-05-07T00:00:00-04:00"
+notes: |
+  Hand-curated from tool-gate.yaml. The deny-list policy is
+  cross-language (Rust, TypeScript, Python, Go). Single-language
+  divergence is a conformance violation by definition — the four
+  guards must produce identical verdicts on identical inputs. The
+  failure_message models exactly that scenario.

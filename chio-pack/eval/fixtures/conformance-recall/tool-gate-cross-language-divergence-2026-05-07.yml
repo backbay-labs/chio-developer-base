@@ -1,0 +1,33 @@
+id: tool-gate-cross-language-divergence-2026-05-07
+failing_test: "crates/chio-conformance/verdict_matrix/tests/verdict_matrix_cross_language.rs::test_tool_gate_consistency"
+failure_message: |
+  FAILED  test_tool_gate_consistency
+    Cross-language verdict divergence on tool-gate fixture #4 (allow_safe_tool):
+      Rust:       allow
+      TypeScript: allow
+      Python:     allow
+      Go:         deny  ← unexpected
+    Per the tool-gate contract, all four guards MUST produce identical
+    verdicts. Go guard is over-rejecting; likely a tool-name comparison
+    or case-sensitivity bug.
+canonical_fix:
+  - file: "crates/chio-conformance/verdict_matrix/tests/verdict_matrix_cross_language.rs"
+    section: "test_tool_gate_consistency"
+  - file: "crates/chio-guards/src/tool_gate.rs"
+    section: "Rust reference implementation"
+  - file: "tests/conformance/fixtures/guard/tool-gate.yaml"
+    section: "fixture canonical specification"
+  - file: "docs/conformance/verdict-matrix.md"
+    section: "Cross-language consistency requirement"
+relevant_arc_pr: "(scenario authored on origin/codex/chio-kb-a-grade-dogfood)"
+relevant_arc_commit: "(verdict-matrix cross-language test)"
+commit_subject: "Conformance test: verdict-matrix cross-language consistency"
+commit_date: "2026-05-07T00:00:00-04:00"
+notes: |
+  Hand-curated. Targets the cross-language verdict-matrix consistency
+  test — the most architecturally important conformance test, since
+  divergence between peer guards undermines the protocol's portability
+  guarantee. The failure_message picks Go as the divergent peer
+  arbitrarily; in practice any one language can be the outlier.
+  See [[../../../vault/spec/sdk-conformance]] for the normative
+  contract.

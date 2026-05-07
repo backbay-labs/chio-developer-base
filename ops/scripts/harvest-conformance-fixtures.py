@@ -54,7 +54,23 @@ TEST_FILE_RE = re.compile(
 )
 
 # Additional test-surface predicates that need path-prefix awareness.
+#
+# A file qualifies as a "conformance test surface" only if its OWN path is
+# in (or near) a conformance directory. Without this gate, the regex would
+# match SDK-level *.test.ts files in commits that ALSO touch conformance
+# paths — but those SDK tests aren't conformance tests; they're unit tests
+# that happen to share a commit. The harvester's job is to find genuine
+# conformance regressions, so the path gate is load-bearing.
 def is_test_file(path: str) -> bool:
+    is_conformance_path = (
+        path.startswith("tests/conformance/")
+        or path.startswith("crates/chio-conformance/")
+        or path.startswith("integrations/mcp-adapter/tests/")
+        or "/conformance/" in path
+        or "/conformance_" in path
+    )
+    if not is_conformance_path:
+        return False
     if TEST_FILE_RE.search(path):
         return True
     # JSON scenario fixtures count as tests
@@ -65,10 +81,9 @@ def is_test_file(path: str) -> bool:
         path.startswith("crates/")
         and "/tests/" in path
         and path.endswith(".rs")
-        and "conformance" in path.lower()
     ):
         return True
-    if path.startswith("integrations/mcp-adapter/tests/") and "conformance" in path.lower():
+    if path.startswith("integrations/mcp-adapter/tests/"):
         return True
     return False
 

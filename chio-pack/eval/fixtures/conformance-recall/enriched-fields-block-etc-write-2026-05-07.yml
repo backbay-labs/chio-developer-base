@@ -1,0 +1,29 @@
+id: enriched-fields-block-etc-write-2026-05-07
+failing_test: "tests/conformance/fixtures/guard/enriched-fields.yaml#deny_etc_passwd_write"
+failure_message: |
+  FAILED  enriched-inspector / deny_etc_passwd_write
+    Expected verdict: deny
+    Got verdict:      allow
+    Request: { tool_name: "file_write", arguments: { path: "/etc/passwd" } }
+    The enriched-inspector guard failed to extract action_type=file_write
+    and extracted_path=/etc/passwd from the structured arguments, so the
+    deny rule for /etc paths never matched.
+canonical_fix:
+  - file: "tests/conformance/fixtures/guard/enriched-fields.yaml"
+    section: "deny_etc_passwd_write fixture"
+  - file: "crates/chio-guards/src/enriched_inspector.rs"
+    section: "argument field extraction"
+  - file: "crates/chio-guards/src/lib.rs"
+    section: "Guard trait, action_type / extracted_path"
+  - file: "spec/PROTOCOL.md"
+    section: "Enriched-inspector guard fields"
+relevant_arc_pr: "(scenario authored on origin/codex/chio-kb-a-grade-dogfood)"
+relevant_arc_commit: "(guard fixture; not a single-commit fix)"
+commit_subject: "Conformance fixture: enriched-inspector blocks file_write to /etc"
+commit_date: "2026-05-07T00:00:00-04:00"
+notes: |
+  Hand-curated from the enriched-fields.yaml guard fixture. This is
+  the Rust-only enriched-inspector guard which uses action_type and
+  extracted_path to enforce file-write restrictions. The failure mode
+  models a real bug class: structured-argument extraction failure
+  causing the deny rule to never match.
