@@ -41,9 +41,11 @@ vault/.obsidian/plugins/*/styles.css
 vault/.obsidian/plugins/*/versions.json
 
 # Community plugin manifests are part of their downloaded distribution.
-# Only our custom plugin's manifest is committed (it's authored, not downloaded).
+# Only our custom plugin's manifest and versions.json are committed
+# (they're authored, not downloaded).
 vault/.obsidian/plugins/*/manifest.json
 !vault/.obsidian/plugins/episode-promoter/manifest.json
+!vault/.obsidian/plugins/episode-promoter/versions.json
 
 # OS / Editor
 .DS_Store
