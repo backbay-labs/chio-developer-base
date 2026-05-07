@@ -17,22 +17,24 @@ WHERE date(file.mtime) >= date(today) - dur(1 day)
 SORT file.mtime DESC
 ```
 
-### ADRs awaiting review
+### My open ADRs
 ```dataview
-TABLE status, owners
+TABLE status, date as "Filed"
 FROM "decisions"
-WHERE status = "proposed"
-SORT file.name ASC
+WHERE status = "proposed" AND contains(owners, "<% tp.user.handle() %>")
+SORT date ASC
 ```
 
-### Stale specs (>60 days since last-validated)
+### Stale specs I own (>60 days since last-validated)
 ```dataview
-TABLE last-validated, owners
+TABLE last-validated
 FROM "spec"
-WHERE last-validated = null OR date(last-validated) < date(today) - dur(60 days)
+WHERE contains(owners, "<% tp.user.handle() %>")
+  AND (last-validated = null OR date(last-validated) < date(today) - dur(60 days))
 SORT last-validated ASC
-LIMIT 5
 ```
+
+> Org-wide views (not filtered to me): [[../_meta/queries/open-adrs]], [[../_meta/queries/stale-specs]], [[../_meta/queries/unowned-capabilities]].
 
 ### Conformance failures (live)
 %% kb_impact: HEAD~1..HEAD %%

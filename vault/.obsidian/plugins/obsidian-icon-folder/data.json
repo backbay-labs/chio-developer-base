@@ -1,0 +1,25 @@
+{
+  "settings": {
+    "iconColor": "#6054A7",
+    "iconsBackgroundCheckedEnabled": true,
+    "iconsBackgroundColor": null,
+    "extraPadding": false,
+    "iconsInNotes": false,
+    "iconsInLinks": true,
+    "iconsInTabs": false,
+    "recentlyUsedIcons": [],
+    "rules": []
+  },
+  "_meta": "LiSettings",
+  "spec": "LiBookOpenText",
+  "decisions": "LiGavel",
+  "episodes": "LiHistory",
+  "playbooks": "LiBookText",
+  "daily": "LiCalendarDays",
+  "crates": "LiPackage",
+  "_meta/templates": "LiFileText",
+  "_meta/queries": "LiSearch",
+  "_meta/diagrams": "LiPenTool",
+  "_meta/dashboards": "LiBarChart",
+  "_meta/templater-scripts": "LiCode"
+}

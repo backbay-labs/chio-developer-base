@@ -1,0 +1,77 @@
+name: eval
+
+# Phase 0 stub. Closes the loop on issue #5 (CI as regression gate) but is
+# intentionally non-blocking until ADR-0002 commits the four outcome-eval
+# baselines. Once those land, flip `continue-on-error: false` and the gate
+# becomes real.
+#
+# The retrieval eval (PR #599's 9-category A floor) is NOT wired here — it
+# requires the docker stack (Phase 1.1+) and runs via `make kb-eval-retrieval`
+# inside the chio-kb-mcp container. Add it to this workflow once the stack
+# brings up cleanly in CI.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  outcomes:
+    name: Outcome evals (Phase 0 — non-blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Run outcome evals
+        id: eval
+        # Phase 0: the runner reports "blocked-fixtures" / "blocked-runner" and
+        # exits 1 by design. Don't fail the build for that expected state.
+        continue-on-error: true
+        run: make kb-eval-outcomes
+
+      - name: Post outcomes report as PR comment
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'vault/_meta/dashboards/eval-outcomes.md';
+            if (!fs.existsSync(path)) {
+              core.warning(`No outcomes report at ${path}`);
+              return;
+            }
+            const body = fs.readFileSync(path, 'utf8');
+            const marker = '<!-- chio-eval-outcomes -->';
+            const tagged = `${marker}\n${body}`;
+            const { data: comments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const existing = comments.find(c => c.body && c.body.startsWith(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                comment_id: existing.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: tagged,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: tagged,
+              });
+            }
