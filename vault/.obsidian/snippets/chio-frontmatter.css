@@ -1,0 +1,96 @@
+/*
+ * chio-frontmatter — visual styling for spec / playbook / episode frontmatter
+ *
+ * Hooks into Obsidian's reading-mode property selectors. Specifically:
+ *   - .metadata-property[data-property-key="..."]   → property block
+ *   - .metadata-property-key                         → key span
+ *   - .metadata-property-value                       → value span
+ *
+ * Selectors evolve across Obsidian versions; this snippet is best-effort.
+ * If a rule stops matching after an Obsidian update, file an issue with the
+ * minor-version delta.
+ */
+
+/* === status pill === */
+
+.metadata-property[data-property-key="status"] .metadata-property-value {
+  font-weight: 600;
+  text-transform: lowercase;
+}
+
+.metadata-property[data-property-key="status"][data-property-value="accepted"] .metadata-property-value {
+  color: #2f855a;
+}
+
+.metadata-property[data-property-key="status"][data-property-value="proposed"] .metadata-property-value {
+  color: #d99124;
+}
+
+.metadata-property[data-property-key="status"][data-property-value="draft"] .metadata-property-value {
+  color: #6054A7;
+}
+
+.metadata-property[data-property-key="status"][data-property-value="superseded"] .metadata-property-value {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.metadata-property[data-property-key="status"][data-property-value="pending"] .metadata-property-value {
+  color: #d15451;
+  font-style: italic;
+}
+
+.metadata-property[data-property-key="status"][data-property-value="imported"] .metadata-property-value {
+  color: var(--text-muted);
+}
+
+/* === chio-node label === */
+
+.metadata-property[data-property-key="chio-node"] .metadata-property-value {
+  background: rgba(96, 84, 167, 0.1);
+  padding: 0 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(96, 84, 167, 0.3);
+  font-weight: 600;
+  color: #6054A7;
+  display: inline-block;
+}
+
+/* === last-validated and date-typed fields === */
+
+.metadata-property[data-property-key="last-validated"] .metadata-property-value,
+.metadata-property[data-property-key="date"] .metadata-property-value,
+.metadata-property[data-property-key="imported_at"] .metadata-property-value {
+  font-family: var(--font-monospace);
+  font-size: 0.95em;
+}
+
+/* === path-typed lists (authoritative_files, tests, related-*) === */
+
+.metadata-property[data-property-key="authoritative_files"] .metadata-property-value,
+.metadata-property[data-property-key="tests"] .metadata-property-value,
+.metadata-property[data-property-key="related-receipts"] .metadata-property-value,
+.metadata-property[data-property-key="related-guards"] .metadata-property-value,
+.metadata-property[data-property-key="related-specs"] .metadata-property-value,
+.metadata-property[data-property-key="supersedes"] .metadata-property-value,
+.metadata-property[data-property-key="related-diagrams"] .metadata-property-value {
+  font-family: var(--font-monospace);
+  font-size: 0.9em;
+}
+
+/* === id field === */
+
+.metadata-property[data-property-key="id"] .metadata-property-value {
+  font-family: var(--font-monospace);
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+/* === seed_content_hash (compact, muted) === */
+
+.metadata-property[data-property-key="seed_content_hash"] .metadata-property-value {
+  font-family: var(--font-monospace);
+  font-size: 0.8em;
+  color: var(--text-faint);
+  word-break: break-all;
+}

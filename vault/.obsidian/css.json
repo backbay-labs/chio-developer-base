@@ -1,5 +1,7 @@
 {
   "enabledSnippets": [
-    "chio-callouts"
+    "chio-callouts",
+    "chio-frontmatter",
+    "chio-tasks"
   ]
 }

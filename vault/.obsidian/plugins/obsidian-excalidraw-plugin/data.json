@@ -1,0 +1,26 @@
+{
+  "folder": "_meta/diagrams",
+  "templateFilePath": "",
+  "showSplashScreen": false,
+  "syncFsTheme": true,
+  "exportWithBackground": true,
+  "exportWithTheme": true,
+  "exportPaddingSVG": 10,
+  "exportEmbedScene": false,
+  "fontSize": 20,
+  "exportSettings": {
+    "imageType": "PNG",
+    "frameRendering": {
+      "enabled": true,
+      "name": true,
+      "outline": true,
+      "clip": true
+    }
+  },
+  "compress": false,
+  "showFilenameInTitle": true,
+  "matchTheme": true,
+  "matchThemeTrigger": true,
+  "newDrawingFilename": "{{date}}-{{time}}",
+  "newDrawingFilenameDateTimeFormat": "YYYY-MM-DD-HHmmss"
+}

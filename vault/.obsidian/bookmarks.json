@@ -1,0 +1,88 @@
+{
+  "items": [
+    {
+      "type": "group",
+      "title": "Start here",
+      "items": [
+        {
+          "type": "file",
+          "path": "vault/playbooks/onboard-a-chio-developer.md",
+          "title": "Day 1 onboarding"
+        },
+        {
+          "type": "file",
+          "path": "vault/_meta/MOC.md",
+          "title": "Map of content"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "title": "Daily",
+      "items": [
+        {
+          "type": "file",
+          "path": "vault/_meta/templates/daily-note.md",
+          "title": "Daily-note template"
+        },
+        {
+          "type": "file",
+          "path": "vault/_meta/queries/stale-specs.md",
+          "title": "Stale specs (org-wide)"
+        },
+        {
+          "type": "file",
+          "path": "vault/_meta/dashboards/eval-outcomes.md",
+          "title": "Eval outcomes (live)"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "title": "Reference",
+      "items": [
+        {
+          "type": "file",
+          "path": "vault/spec/capability-revocation.md",
+          "title": "Spec — capability revocation"
+        },
+        {
+          "type": "file",
+          "path": "vault/spec/receipt-commitment.md",
+          "title": "Spec — receipt commitment"
+        },
+        {
+          "type": "file",
+          "path": "vault/spec/guard-pipeline.md",
+          "title": "Spec — guard pipeline"
+        },
+        {
+          "type": "file",
+          "path": "vault/playbooks/release-qualification.md",
+          "title": "Playbook — release qualification"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "title": "Project",
+      "items": [
+        {
+          "type": "file",
+          "path": "PLAN.md",
+          "title": "PLAN.md"
+        },
+        {
+          "type": "file",
+          "path": "AGENTS.md",
+          "title": "AGENTS.md (the rules)"
+        },
+        {
+          "type": "file",
+          "path": "decisions/ADR-0000-charter.md",
+          "title": "ADR-0000 — charter"
+        }
+      ]
+    }
+  ]
+}

@@ -1,16 +1,16 @@
 ---
-id: episode.SLUG
+id: episode.<% await tp.user.episode_id(tp) %>
 type: episode-architecture-summary
 status: draft
 scope: chio-repo
-title: TITLE
-graphiti_episode_name: TITLE
+title: <% tp.file.title %>
+graphiti_episode_name: <% tp.file.title %>
 source_description: ""
 authoritative_files: []
 imported_at: <% tp.date.now("YYYY-MM-DDTHH:mm:ssZ") %>
 ---
 
-# TITLE
+# <% tp.file.title %>
 
 > One-paragraph summary that becomes the Graphiti episode body when the vault-sync daemon (Phase 1) derives this episode. Be concrete — the daemon does not enrich, it only reformats.
 

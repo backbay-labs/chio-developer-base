@@ -1,0 +1,32 @@
+/*
+ * chio-tasks — visual tweaks for the obsidian-tasks-plugin output
+ *
+ * Minimal: better rhythm, monospace dates in the Backbay accent. Intentionally
+ * does NOT add icons or per-tag emoji prefixes — Chio favors text-density over
+ * visual clutter.
+ */
+
+/* Better breathing room between tasks */
+.task-list-item {
+  margin-bottom: 4px;
+}
+
+/* Tasks-plugin query tables: monospace dates in the Backbay accent */
+.tasks-list-text + .task-due-date,
+.tasks-list-text + .task-scheduled-date,
+.tasks-list-text + .task-start-date,
+.task-due,
+.task-scheduled,
+.task-start {
+  color: #6054A7;
+  font-family: var(--font-monospace);
+  font-size: 0.85em;
+}
+
+/* Recurrence marker: muted; the recurrence rule is rarely the most important
+ * thing the rater needs to see when scanning a task list. */
+.task-recurring {
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: 0.8em;
+}
