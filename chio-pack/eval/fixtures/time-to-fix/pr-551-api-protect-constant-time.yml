@@ -1,0 +1,37 @@
+id: pr-551-api-protect-constant-time-2026-05-05
+title: "api-protect compares sidecar bearer tokens with non-constant-time comparison (timing leak)"
+source: "arc#PR-551"
+
+arc_commit_before: "c03239506806dd7efff1eaa5444c9fa3bab774fd"
+arc_commit_after:  "15b283b54e67459eab6938267ff4a44232bcda47"
+
+agent:
+  runner: codex-cli
+  model:  claude-opus-4-7
+  budget_seconds:    1800
+  budget_tool_calls: 100
+
+seed_state:
+  starting_branch: "main@c03239506806dd7efff1eaa5444c9fa3bab774fd"
+  failing_test:    "crates/chio-api-protect/src/proxy.rs::test_bearer_token_compare_is_constant_time"
+
+expected:
+  patch_signature: "constant-time"
+  tests_must_pass:
+    - "crates/chio-api-protect/src/proxy.rs::test_bearer_token_compare_is_constant_time"
+
+scoring:
+  time_weight:      0.6
+  tool_call_weight: 0.4
+  zero_score_if:
+    - "any expected test still failing"
+    - "patch deletes any existing test"
+
+notes: |
+  Hand-curated from arc PR #551 metadata. Security-sensitive fix:
+  bearer-token comparison must be constant-time to prevent timing
+  side-channel attacks. The test likely uses a statistical timing
+  harness or a mocked compare with timing instrumentation. The fix
+  is small (4 files, mostly the proxy.rs change). Tests the agent's
+  retrieval of `subtle.ConstantTimeEq` / `tokio_util::time` patterns
+  for constant-time crypto.

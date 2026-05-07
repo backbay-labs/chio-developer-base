@@ -1,0 +1,38 @@
+id: pr-592-sibling-sum-budget-oversubscription-2026-05-05
+title: "Sibling capability budgets allowed to oversubscribe their parent (P0)"
+source: "arc#PR-592"
+
+arc_commit_before: "bc964f12725ab8c02c690a60c57e261f5954da2f"
+arc_commit_after:  "ff9ff73144b7aab9081ad84b8dcf81c7d421c582"
+
+agent:
+  runner: codex-cli
+  model:  claude-opus-4-7
+  budget_seconds:    1800
+  budget_tool_calls: 100
+
+seed_state:
+  starting_branch: "main@bc964f12725ab8c02c690a60c57e261f5954da2f"
+  failing_test:    "crates/chio-conformance/tests/budget_split_rejects_oversubscribed_siblings.rs::test_oversubscribed_sibling_budgets_rejected"
+
+expected:
+  patch_signature: "budget_split"
+  tests_must_pass:
+    - "crates/chio-conformance/tests/budget_split_rejects_oversubscribed_siblings.rs::test_oversubscribed_sibling_budgets_rejected"
+    - "crates/chio-conformance/tests/budget_split_cross_hop_rejects_amplification.rs::test_cross_hop_amplification_rejected"
+
+scoring:
+  time_weight:      0.6
+  tool_call_weight: 0.4
+  zero_score_if:
+    - "any expected test still failing"
+    - "patch deletes any existing test"
+
+notes: |
+  Hand-curated from arc PR #592 metadata. **P0 security fix** following
+  PR #591. Budget split across delegated siblings was failing to enforce
+  that the sum doesn't exceed the parent's budget. Two new conformance
+  tests (209 + 186 lines) cover (a) sibling oversubscription within
+  one hop and (b) cross-hop amplification. Both tests must pass.
+  The agent must recognize this is a budget-conservation invariant
+  ("sibling sums ≤ parent sum") and find the canonical violation site.

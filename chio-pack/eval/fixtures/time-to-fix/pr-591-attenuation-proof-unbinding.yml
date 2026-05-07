@@ -1,0 +1,38 @@
+id: pr-591-attenuation-proof-unbinding-2026-05-05
+title: "attenuation_proof allows parent_scope_hash unbinding — child cap can claim wider scope (P0)"
+source: "arc#PR-591"
+
+arc_commit_before: "5498b0cbe344acc5e108f040f6c7a910f8c96b78"
+arc_commit_after:  "bc964f12725ab8c02c690a60c57e261f5954da2f"
+
+agent:
+  runner: codex-cli
+  model:  claude-opus-4-7
+  budget_seconds:    1800
+  budget_tool_calls: 100
+
+seed_state:
+  starting_branch: "main@5498b0cbe344acc5e108f040f6c7a910f8c96b78"
+  failing_test:    "crates/chio-conformance/tests/attenuation_witness_rejects_inflated_parent_scope.rs::test_inflated_parent_scope_rejected"
+
+expected:
+  patch_signature: "parent_scope_hash"
+  tests_must_pass:
+    - "crates/chio-conformance/tests/attenuation_witness_rejects_inflated_parent_scope.rs::test_inflated_parent_scope_rejected"
+
+scoring:
+  time_weight:      0.6
+  tool_call_weight: 0.4
+  zero_score_if:
+    - "any expected test still failing"
+    - "patch deletes any existing test"
+
+notes: |
+  Hand-curated from arc PR #591 metadata. **P0 security fix.** The
+  attenuation proof failed to bind to parent_scope_hash, letting a child
+  capability falsely claim a wider scope than its parent. The PR added
+  a new conformance test (183 lines) that asserts inflated parent
+  scopes are rejected. Test fn name guessed; verify on first runner
+  exercise. This is one of the most architecturally important fixtures
+  — exercises the agent's ability to find both the protocol bug and
+  the conformance assertion that pins it.

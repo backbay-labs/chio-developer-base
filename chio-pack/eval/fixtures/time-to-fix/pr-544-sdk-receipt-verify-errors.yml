@@ -1,0 +1,36 @@
+id: pr-544-sdk-receipt-verify-errors-2026-05-04
+title: "TypeScript node-http SDK swallows receipt-verify protocol errors"
+source: "arc#PR-544"
+
+arc_commit_before: "c03239506806dd7efff1eaa5444c9fa3bab774fd"
+arc_commit_after:  "e658f765f5be5c86cf22f789750c6839c7fefe1c"
+
+agent:
+  runner: codex-cli
+  model:  claude-opus-4-7
+  budget_seconds:    1800
+  budget_tool_calls: 100
+
+seed_state:
+  starting_branch: "main@c03239506806dd7efff1eaa5444c9fa3bab774fd"
+  failing_test:    "sdks/typescript/packages/node-http/test/sidecar-client.test.ts:surfaces protocol errors from receipt verify"
+
+expected:
+  patch_signature: "receipt-verify protocol errors"
+  tests_must_pass:
+    - "sdks/typescript/packages/node-http/test/sidecar-client.test.ts:surfaces protocol errors from receipt verify"
+
+scoring:
+  time_weight:      0.6
+  tool_call_weight: 0.4
+  zero_score_if:
+    - "any expected test still failing"
+    - "patch deletes any existing test"
+
+notes: |
+  Hand-curated from arc PR #544 metadata. The SDK was swallowing
+  receipt-verify protocol errors instead of surfacing them — a real
+  observability bug class. The PR added 265 lines to the SDK test file,
+  suggesting comprehensive failure-mode coverage. Test name is the
+  best-guess Vitest title from the PR description; verify on first
+  runner exercise.

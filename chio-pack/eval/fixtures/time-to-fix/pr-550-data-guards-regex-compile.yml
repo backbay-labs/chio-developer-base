@@ -1,0 +1,37 @@
+id: pr-550-data-guards-regex-compile-2026-05-04
+title: "default redactor swallows regex compile failures, leaks unfiltered data"
+source: "arc#PR-550"
+
+arc_commit_before: "c03239506806dd7efff1eaa5444c9fa3bab774fd"
+arc_commit_after:  "883b45b254f9d3f4729abce29bf5a9a73f793ac9"
+
+agent:
+  runner: codex-cli
+  model:  claude-opus-4-7
+  budget_seconds:    1800
+  budget_tool_calls: 100
+
+seed_state:
+  starting_branch: "main@c03239506806dd7efff1eaa5444c9fa3bab774fd"
+  failing_test:    "crates/chio-data-guards/redactors/default/src/lib.rs::test_compile_failure_surfaces_as_redaction_error"
+
+expected:
+  patch_signature: "regex compile"
+  tests_must_pass:
+    - "crates/chio-data-guards/redactors/default/src/lib.rs::test_compile_failure_surfaces_as_redaction_error"
+
+scoring:
+  time_weight:      0.6
+  tool_call_weight: 0.4
+  zero_score_if:
+    - "any expected test still failing"
+    - "patch deletes any existing test"
+
+notes: |
+  Hand-curated from arc PR #550 metadata. Single-file change (199
+  additions / 24 deletions). The default data-guard redactor was
+  swallowing regex compile failures silently — a fail-open bug that
+  let unfiltered data through when a user-provided redaction pattern
+  was malformed. Tests the agent's recognition of fail-closed vs
+  fail-open semantics, plus understanding of where redaction errors
+  must be surfaced (immediately, not buffered).

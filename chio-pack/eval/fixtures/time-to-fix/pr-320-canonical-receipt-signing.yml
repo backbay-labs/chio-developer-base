@@ -1,0 +1,35 @@
+id: pr-320-canonical-receipt-signing-2026-04-29
+title: "Kernel signing task uses non-canonical receipt encoding (signature mismatches across peers)"
+source: "arc#PR-320"
+
+arc_commit_before: "b9ab2ba79d3389d6d6bead5cbfcd58fa27486a37"
+arc_commit_after:  "ecfbbe6e5c3eaa9f5cd318893a4eb564c3eea0ca"
+
+agent:
+  runner: codex-cli
+  model:  claude-opus-4-7
+  budget_seconds:    1800
+  budget_tool_calls: 100
+
+seed_state:
+  starting_branch: "main@b9ab2ba79d3389d6d6bead5cbfcd58fa27486a37"
+  failing_test:    "crates/chio-kernel/src/kernel/signing_task.rs::test_canonical_receipt_signature_matches_peer_verifiers"
+
+expected:
+  patch_signature: "shared canonical receipt signing"
+  tests_must_pass:
+    - "crates/chio-kernel/src/kernel/signing_task.rs::test_canonical_receipt_signature_matches_peer_verifiers"
+
+scoring:
+  time_weight:      0.6
+  tool_call_weight: 0.4
+  zero_score_if:
+    - "any expected test still failing"
+    - "patch deletes any existing test"
+
+notes: |
+  Hand-curated from arc PR #320 metadata. The fix routes the kernel's
+  signing task through a shared canonical encoder so receipt signatures
+  agree with peer verifiers. Test signature is estimated from the PR
+  title; verify on first runner exercise. Single-file change (1 file,
+  59 additions / 14 deletions) — well-scoped.

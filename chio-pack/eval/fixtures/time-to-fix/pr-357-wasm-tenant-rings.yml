@@ -1,0 +1,35 @@
+id: pr-357-wasm-tenant-rings-2026-04-30
+title: "WASM guard runtime grows tenant ring buffers without bound (memory blowup under burst)"
+source: "arc#PR-357"
+
+arc_commit_before: "770cfc71a8596a5309cc4c03f19ff2e8637a9164"
+arc_commit_after:  "1aadbe24d6ba94222fce4a94fa81721fc3d0aa0b"
+
+agent:
+  runner: codex-cli
+  model:  claude-opus-4-7
+  budget_seconds:    1800
+  budget_tool_calls: 100
+
+seed_state:
+  starting_branch: "main@770cfc71a8596a5309cc4c03f19ff2e8637a9164"
+  failing_test:    "crates/chio-wasm-guards/src/runtime.rs::test_warm_tenant_ring_bounded_under_burst"
+
+expected:
+  patch_signature: "warm tenant ring"
+  tests_must_pass:
+    - "crates/chio-wasm-guards/src/runtime.rs::test_warm_tenant_ring_bounded_under_burst"
+
+scoring:
+  time_weight:      0.6
+  tool_call_weight: 0.4
+  zero_score_if:
+    - "any expected test still failing"
+    - "patch deletes any existing test"
+
+notes: |
+  Hand-curated from arc PR #357 metadata. Single-file change to
+  chio-wasm-guards/src/runtime.rs (245 additions / 17 deletions) bounds
+  the warm-tenant ring buffer. Failure mode at parent commit: bursts
+  cause unbounded memory growth in the wasm runtime. Test name
+  estimated; verify on first runner exercise.

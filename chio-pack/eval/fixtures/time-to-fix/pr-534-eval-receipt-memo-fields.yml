@@ -1,0 +1,39 @@
+id: pr-534-eval-receipt-memo-fields-2026-05-05
+title: "eval-receipt accepts duplicate and unknown memo signature fields (verifier acceptance bug)"
+source: "arc#PR-534"
+
+arc_commit_before: "47fe8d30c1198bc260a80d43243cdfccecd5777b"
+arc_commit_after:  "6f267d66ddc03cf625fdb86a1aae6b0b6dad0e35"
+
+agent:
+  runner: codex-cli
+  model:  claude-opus-4-7
+  budget_seconds:    1800
+  budget_tool_calls: 100
+
+seed_state:
+  starting_branch: "main@47fe8d30c1198bc260a80d43243cdfccecd5777b"
+  failing_test:    "crates/chio-eval-receipt/src/lib.rs::test_duplicate_memo_signature_field_rejected"
+
+expected:
+  patch_signature: "duplicate and unknown memo"
+  tests_must_pass:
+    - "crates/chio-eval-receipt/src/lib.rs::test_duplicate_memo_signature_field_rejected"
+    - "crates/chio-eval-receipt/src/lib.rs::test_unknown_memo_signature_field_rejected"
+    - "crates/chio-cli/tests/federation_policy.rs::test_eval_receipt_rejects_invalid_memo"
+
+scoring:
+  time_weight:      0.6
+  tool_call_weight: 0.4
+  zero_score_if:
+    - "any expected test still failing"
+    - "patch deletes any existing test"
+
+notes: |
+  Hand-curated from arc PR #534 metadata. Multi-test fixture covering
+  the eval-receipt verifier's strict-acceptance contract: duplicate
+  memo signature fields and unknown memo signature fields MUST both be
+  rejected. The PR touched 16 files including the CLI federation_policy
+  test, suggesting the bug had broad blast radius. Tests the agent's
+  ability to read the spec for what receipts MUST accept/reject and
+  apply that to all the surfaces (lib + CLI + federation policy).
