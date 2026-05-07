@@ -85,7 +85,8 @@ Obsidian is **one renderer** of the vault — the vault works without it. Cursor
 
 - Install Obsidian: <https://obsidian.md>.
 - Open `vault/` as your vault.
-- The first time you open it, Obsidian creates `vault/.obsidian/`. Most of that is gitignored (per-user state). The committed parts (`community-plugins.json`, themes, snippets) load automatically once Phase 3 lands.
+- Open the **repo root** (`chio-developer-base/`) as your Obsidian vault, not just `vault/` — per [ADR-0003](../../decisions/ADR-0003-vault-layout.md), the vault root is the repo root so ADRs and PLAN.md are wikilinkable.
+- The first time you open it, Obsidian writes per-user state into `.obsidian/` (workspace, app, hotkey overrides). Most of that is gitignored. The committed parts (`community-plugins.json`, themes, snippets, plugin defaults) load automatically.
 - Pinned plugins (Phase 3): Dataview, Templater, Obsidian Git, Excalidraw, Tasks, Periodic Notes, Iconize, Style Settings. **Don't add others** without an ADR.
 
 ## Before you ship anything

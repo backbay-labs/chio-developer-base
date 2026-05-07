@@ -13,14 +13,14 @@ Custom Obsidian plugin for chio-developer-base. Promotes a daily note's `## What
 
 ## What it does NOT do
 
-- **It does not call Graphiti directly.** Per [AGENTS.md](../../../../AGENTS.md) hard rule #1, the vault-sync daemon is the only writer to Graphiti. This plugin writes the markdown file; the daemon picks it up.
+- **It does not call Graphiti directly.** Per [AGENTS.md](../../../AGENTS.md) hard rule #1, the vault-sync daemon is the only writer to Graphiti. This plugin writes the markdown file; the daemon picks it up.
 - **It does not auto-promote.** The modal's confirmation step is mandatory by design — auto-promotion would poison the graph within a week (per the Obsidian-UX brainstorm).
 - **It does not extract entities or graph edges yet.** Phase 1+ feature: parse the body for symbol references and propose edges. Today, the plugin writes a simple frontmatter shell.
 
 ## Develop
 
 ```sh
-cd vault/.obsidian/plugins/episode-promoter
+cd .obsidian/plugins/episode-promoter
 npm install
 npm run dev          # watches src/main.ts → main.js
 ```
@@ -55,12 +55,12 @@ Bump `version` in `manifest.json` AND `package.json` together. Plugin versions a
 
 ## Phase awareness
 
-This is a **Phase 3** deliverable per [PLAN.md](../../../../PLAN.md). Listed in [`vault/.obsidian/community-plugins.json`](../../community-plugins.json) so Obsidian recognizes it; will fail to load until `main.js` is built. That's fine — the vault works without Obsidian.
+This is a **Phase 3** deliverable per [PLAN.md](../../../PLAN.md). Listed in [`.obsidian/community-plugins.json`](../../community-plugins.json) so Obsidian recognizes it; will fail to load until `main.js` is built. That's fine — the vault works without Obsidian.
 
 ## See also
 
-- [AGENTS.md](../../../../AGENTS.md) — hard rule on no-direct-Graphiti-writes
-- [PLAN.md](../../../../PLAN.md) — Phase 3 vault UX layer
-- [`vault/_meta/templates/daily-note.md`](../../../_meta/templates/daily-note.md) — what a "What I learned" section looks like
-- [`vault/episodes/_README.md`](../../../episodes/_README.md) — what a real episode looks like
-- [`migrate-seeds.py`](../../../../ops/scripts/migrate-seeds.py) — a sibling: writes the same shape of frontmatter from JSON seeds. The two should converge on identical schemas.
+- [AGENTS.md](../../../AGENTS.md) — hard rule on no-direct-Graphiti-writes
+- [PLAN.md](../../../PLAN.md) — Phase 3 vault UX layer
+- [`vault/_meta/templates/daily-note.md`](../../../vault/_meta/templates/daily-note.md) — what a "What I learned" section looks like
+- [`vault/episodes/_README.md`](../../../vault/episodes/_README.md) — what a real episode looks like
+- [`migrate-seeds.py`](../../../ops/scripts/migrate-seeds.py) — a sibling: writes the same shape of frontmatter from JSON seeds. The two should converge on identical schemas.

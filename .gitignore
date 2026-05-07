@@ -20,32 +20,32 @@ kb-engine/uv.lock
 .cocoindex/
 
 # === Obsidian ===
-# vault/.obsidian/ holds the canonical config (community-plugins.json,
+# .obsidian/ holds the canonical config (community-plugins.json,
 # core-plugins.json, snippets, plugin data.json defaults, custom plugin source).
 # These specific files inside it are per-user/per-machine and NOT tracked:
-vault/.obsidian/workspace.json
-vault/.obsidian/workspace-mobile.json
-vault/.obsidian/cache
-vault/.obsidian/graph.json
-vault/.obsidian/app.json
-vault/.obsidian/hotkeys.json
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+.obsidian/graph.json
+.obsidian/app.json
+.obsidian/hotkeys.json
 
 # Themes are user-installed
-vault/.obsidian/themes/
+.obsidian/themes/
 
 # Plugin code is downloaded by Obsidian on first launch (community plugins) or
 # built locally (our custom plugin). Don't commit either.
-vault/.obsidian/plugins/*/main.js
-vault/.obsidian/plugins/*/main.js.map
-vault/.obsidian/plugins/*/styles.css
-vault/.obsidian/plugins/*/versions.json
+.obsidian/plugins/*/main.js
+.obsidian/plugins/*/main.js.map
+.obsidian/plugins/*/styles.css
+.obsidian/plugins/*/versions.json
 
 # Community plugin manifests are part of their downloaded distribution.
 # Only our custom plugin's manifest and versions.json are committed
 # (they're authored, not downloaded).
-vault/.obsidian/plugins/*/manifest.json
-!vault/.obsidian/plugins/episode-promoter/manifest.json
-!vault/.obsidian/plugins/episode-promoter/versions.json
+.obsidian/plugins/*/manifest.json
+!.obsidian/plugins/episode-promoter/manifest.json
+!.obsidian/plugins/episode-promoter/versions.json
 
 # OS / Editor
 .DS_Store

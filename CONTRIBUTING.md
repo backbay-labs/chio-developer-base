@@ -32,7 +32,7 @@ If your change conflicts with one of these rules, the rule wins. File an ADR if 
 **Lower-value contributions (please discuss before opening a PR):**
 
 - New top-level vault folders. Requires an ADR per [PLAN.md](PLAN.md) "Vault layout".
-- New Obsidian community plugins added to [`vault/.obsidian/community-plugins.json`](vault/.obsidian/community-plugins.json). Plugin choices are an ADR-level decision.
+- New Obsidian community plugins added to [`.obsidian/community-plugins.json`](.obsidian/community-plugins.json). Plugin choices are an ADR-level decision.
 - Changes to the engine ↔ pack boundary. Always opens with an ADR.
 - Adjustments to outcome-eval targets in [`chio-pack/eval/outcomes.yml`](chio-pack/eval/outcomes.yml). These are decisions about what "the carve-out works" means and need an ADR.
 
@@ -88,7 +88,7 @@ kb-gate: ack
 
 - **Markdown:** match the conventions in existing files. Frontmatter must validate against [`chio_pack/frontmatter.py`](chio-pack/) (Phase 1+).
 - **Python:** target Python 3.11+. The two scripts under [`ops/scripts/`](ops/scripts/) and the [`chio_pack/eval/runner.py`](chio-pack/chio_pack/eval/runner.py) skeleton are the style guides.
-- **TypeScript** (Obsidian plugins): match [`episode-promoter/src/main.ts`](vault/.obsidian/plugins/episode-promoter/src/main.ts).
+- **TypeScript** (Obsidian plugins): match [`episode-promoter/src/main.ts`](.obsidian/plugins/episode-promoter/src/main.ts).
 - **Comments:** lean toward "no comment" by default. Add a comment when the *why* is non-obvious — never to explain *what* well-named code already shows.
 
 ## License and contributor sign-off

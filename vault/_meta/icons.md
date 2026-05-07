@@ -5,7 +5,7 @@ type: meta
 
 # Folder icon mapping
 
-> Canonical folder-icon assignments. Configured in [`vault/.obsidian/plugins/obsidian-icon-folder/data.json`](../.obsidian/plugins/obsidian-icon-folder/data.json) and consumed by the **Iconize** community plugin (formerly "Obsidian Icon Folder").
+> Canonical folder-icon assignments. Configured in [`.obsidian/plugins/obsidian-icon-folder/data.json`](../../.obsidian/plugins/obsidian-icon-folder/data.json) and consumed by the **Iconize** community plugin (formerly "Obsidian Icon Folder").
 
 ## Why icons exist
 
@@ -37,7 +37,7 @@ If a folder doesn't appear here, it has no canonical icon. Don't add one without
 
 ## Color
 
-All icons share the Backbay accent (`#6054A7`, see [`vault/.obsidian/appearance.json`](../.obsidian/appearance.json)). The iconize setting `iconsInLinks: true` extends the icon to wikilinks too, so when a daily note links to a spec, the spec link carries the open-book icon inline.
+All icons share the Backbay accent (`#6054A7`, see [`.obsidian/appearance.json`](../../.obsidian/appearance.json)). The iconize setting `iconsInLinks: true` extends the icon to wikilinks too, so when a daily note links to a spec, the spec link carries the open-book icon inline.
 
 ## Adding a new folder
 

@@ -9,7 +9,7 @@ User-defined JavaScript functions for the [Templater](https://silentvoid13.githu
 
 ## Wired up by
 
-The Templater plugin's `user_scripts_folder` is set to this directory. See [`vault/.obsidian/plugins/templater-obsidian/data.json`](../../.obsidian/plugins/templater-obsidian/data.json).
+The Templater plugin's `user_scripts_folder` is set to this directory. See [`.obsidian/plugins/templater-obsidian/data.json`](../../../.obsidian/plugins/templater-obsidian/data.json).
 
 ## What's here
 

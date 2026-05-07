@@ -71,7 +71,7 @@ type: meta
 - [[diagrams/receipt-commitment-chain]]
 - [[diagrams/release-qualification-flow]]
 
-New Excalidraw drawings save to `vault/_meta/diagrams/` by default — see [`vault/.obsidian/plugins/obsidian-excalidraw-plugin/data.json`](../.obsidian/plugins/obsidian-excalidraw-plugin/data.json).
+New Excalidraw drawings save to `vault/_meta/diagrams/` by default — see [`.obsidian/plugins/obsidian-excalidraw-plugin/data.json`](../../.obsidian/plugins/obsidian-excalidraw-plugin/data.json).
 
 ## Recently active vault notes
 
@@ -85,6 +85,6 @@ SORT file.mtime DESC
 LIMIT 10
 ```
 
-## Open questions
+## Resolved questions
 
-- **Vault layout: vault root vs. repo root.** Today the Obsidian vault root is `vault/`, and repo-root files (PLAN, AGENTS, decisions/) need to be linked as plain markdown rather than wikilinks. The alternative — making the *repo root* the Obsidian vault root — would let everything be wikilinked, at the cost of `chio-pack/`, `kb-engine/`, etc. appearing in the Obsidian file explorer. No ADR yet; flagged here so the question is visible.
+- **Vault layout: vault root vs. repo root.** **Resolved by [ADR-0003](../../decisions/ADR-0003-vault-layout.md).** The Obsidian vault root is the repo root. Wikilinks across the entire repo (vault notes, ADRs, PLAN, README) work uniformly. The folder named `vault/` is historical — it holds the bulk of curated knowledge but is no longer the Obsidian vault root.

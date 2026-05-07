@@ -32,7 +32,7 @@ interface EpisodePromoterSettings {
 }
 
 const DEFAULT_SETTINGS: EpisodePromoterSettings = {
-  episodesFolder: "episodes",
+  episodesFolder: "vault/episodes",
   whatILearnedHeading: "## What I learned",
 };
 
@@ -72,7 +72,7 @@ export default class EpisodePromoter extends Plugin {
   }
 
   private isDailyNote(file: TFile | null): boolean {
-    return !!file && file.path.startsWith("daily/");
+    return !!file && file.path.startsWith("vault/daily/");
   }
 
   private async runPromotion(view: MarkdownView) {
