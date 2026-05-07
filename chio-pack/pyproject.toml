@@ -1,0 +1,30 @@
+[project]
+name = "chio-pack"
+version = "0.1.0"
+description = "Chio-specific schema, MCP tools, and outcome evals for chio-developer-base"
+requires-python = ">=3.11"
+authors = [{ name = "Backbay" }]
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+# Phase 0+: outcome eval runner (skeleton; runners are Phase 1).
+chio-pack-eval = "chio_pack.eval.runner:main"
+
+# Phase 2A: PR-impact gate backtest. Stub that exits with a clear blocker.
+# chio-pack-gate-backtest = "chio_pack.tools.gate_backtest:main"
+
+# Phase 2B: signed-retrieval verifier.
+# chio-pack-verify = "chio_pack.tools.verify_retrieval:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["chio_pack"]
+
+# Future test deps go in a dependency group:
+# [dependency-groups]
+# dev = ["pytest>=8"]

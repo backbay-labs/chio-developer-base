@@ -1,0 +1,102 @@
+# chio-pack outcome evals — Phase 0 spec
+#
+# This file is the machine-readable definition of the outcome evals described
+# in PHASE-0.md. The runner at chio-pack/chio_pack/eval/runner.py consumes it.
+#
+# Fixtures live alongside this file in fixtures/<eval-id>/<fixture-id>.yml.
+#
+# Phase 0 done = every entry with `baseline_required: true` has a baseline
+# committed in vault/_meta/dashboards/eval-outcomes.md, AND ADR-0002 confirms
+# the baselines.
+
+version: 1
+
+evals:
+  - id: time-to-first-correct-fix
+    type: behavioral
+    runner: chio_pack.eval.runners.time_to_fix
+    fixtures: fixtures/time-to-fix/*.yml
+    fixture_count_min: 8
+    baseline_required: true
+    target:
+      metric: mean_score
+      direction: up
+      improvement_over_baseline: 0.30      # +30% mean score by Phase 4
+    regression_threshold: 0.10             # 10% of rolling 30d mean
+
+  - id: repeated-mistake-rate
+    type: behavioral
+    runner: chio_pack.eval.runners.repeated_mistake
+    inputs: ~/.chio-dev/sessions/*.jsonl
+    rolling_window_sessions: 50
+    baseline_required: true
+    baseline_min_sessions: 20
+    target:
+      metric: rate
+      direction: down
+      absolute: 0.10                       # < 10% of mistakes are repeats
+    regression_threshold: 0.10
+
+  - id: conformance-harness-recall
+    type: retrieval
+    runner: chio_pack.eval.runners.conformance_recall
+    fixtures: fixtures/conformance-recall/*.yml
+    fixture_count_min: 20
+    baseline_required: true
+    target:
+      metric: recall_at_3
+      direction: up
+      absolute: 0.85
+    regression_threshold: 0.05
+
+  - id: capability-error-explanation
+    type: subjective
+    runner: chio_pack.eval.runners.cap_error_explanation
+    fixtures: fixtures/cap-error-explanation/*.yml
+    fixture_count_min: 10
+    rubric: rubrics.md#capability-error-explanation-rubric-eval-4
+    raters: 3
+    disagreement_flag_threshold: 1         # max - min > 1 on any dimension
+    baseline_required: true
+    baseline_augmentation: raw             # only `raw` is baselined in Phase 0
+    target:
+      metric: mean_scenario_score
+      direction: up
+      absolute: 4.0
+      conditions:                          # targets apply to these augmentations
+        - augmentation: kb_brief_feature
+        - augmentation: kb_brief_feature + signed_receipt
+        - augmentation: kb_brief_feature + episode_link
+    regression_threshold: 0.30             # subjective evals tolerate more variance
+
+# Phase 2 evals — declared here so a Phase 1 contributor cannot quietly skip
+# the gate. Runner attempts before `blocked_until` is reached fail loudly.
+deferred:
+  - id: signed-retrieval
+    blocked_until: phase-2b
+    note: "Requires kb-engine/kb_engine/receipt/envelope.py — see PLAN.md Moonshot 2."
+    target_when_unblocked:
+      metric: verifiable_fraction
+      absolute: 1.0                        # binary: every response carries a verifiable receipt
+
+  - id: pr-impact-gate-precision-recall
+    blocked_until: phase-2a
+    note: "Requires chio-pr-gate/ — see PLAN.md Moonshot 1."
+    target_when_unblocked:
+      precision: 0.70
+      recall:    0.80
+      backtest_window_prs: 50
+
+reporting:
+  output: ../../vault/_meta/dashboards/eval-outcomes.md
+  format: markdown
+  history_file: ../../vault/_meta/dashboards/eval-outcomes-history.jsonl
+  status_thresholds:
+    green: 1.0    # at-or-better than target
+    yellow: 0.5   # halfway between baseline and target
+    red: 0.0      # at-or-worse than baseline
+
+# Regression policy summary (authoritative form lives in PHASE-0.md):
+# 1. Retrieval eval (PR #599's 9 categories) below overall A         → CI red, hard floor.
+# 2. Any outcome eval beyond its regression_threshold                → CI red.
+# 3. Eval 4 disagreement-flag rate > 30%                             → CI red, rubric audit required.

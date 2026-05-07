@@ -1,0 +1,86 @@
+# Example conformance-harness-recall fixture (Eval 3, retrieval-augmented).
+#
+# Copy this file to a real fixture name (e.g., js-peer-revoke-checkpoint-2026-02-18.yml)
+# and replace placeholder values. The runner ignores files with `_example: true`.
+#
+# See chio-pack/eval/PHASE-0.md "Eval 3" for the field reference and
+# `ops/scripts/harvest-conformance-fixtures.py` for an auto-harvest starting point.
+
+_example: true
+
+# === Identity ===
+
+# Stable kebab-case ID. Convention: <peer>-<area>-<short-slug>-<YYYY-MM-DD>.
+id: example-conformance-id-YYYY-MM-DD
+
+# Free-form curator note. The auto-harvester writes this with confidence level;
+# delete it once you've curated the fixture and confirmed it's good ground truth.
+# (`_review:` is also acceptable as a stronger marker — fixtures with `_review:`
+# are flagged in eval-outcomes reports as not-yet-curated.)
+# _review: "confidence=medium; auto-harvested 2026-02-18; manually curated 2026-02-20"
+
+# === The failure ===
+
+# Test signature in the language's standard form:
+#   Python: path/to/test.py::test_function_name
+#   JS/TS:  path/to/test.test.ts:test_name_string
+#   Rust:   crate-name::module::test_function_name
+failing_test: "tests/conformance/peers/js/test_receipts.test.ts:checkpoint_inclusion_proof"
+
+# The actual failure output as it appeared in CI. This is the retrieval query
+# input — the eval issues `kb_search_code(failure_message)` and
+# `kb_search_docs(failure_message)` and computes recall@3 over their union.
+#
+# Keep it realistic. Don't trim stack traces or normalize variable names —
+# real failures aren't normalized, and retrieval quality is judged on real input.
+failure_message: |
+  Expected receipt to include checkpoint root, got undefined.
+  At RevokeReceipt.serialize() line 47.
+
+# === The canonical fix ===
+#
+# The list of files that authoritative-ly resolve this failure. Recall@3 is
+# computed as |canonical_fix ∩ top_3| / |canonical_fix|.
+#
+# Multi-fix fixtures cap at recall@3 = 3/N — the eval is intentionally biased
+# toward retrieval surfacing the MOST authoritative file first, not all of them.
+#
+# `section` is a free-form anchor that helps a curator verify the right slice
+# of a long file is what the canonical fix touches. For now, the eval doesn't
+# inspect `section`; it's documentation. Phase 2 may bump anchor-level matching.
+canonical_fix:
+  - file: "docs/standards/CHIO_RECEIPTS_PROFILE.md"
+    section: "Checkpoint inclusion"
+  - file: "spec/schemas/chio-wire/v1/receipt/inclusion-proof.schema.json"
+    section: "full"
+  - file: "crates/chio-receipts/src/checkpoint.rs"
+    section: "checkpoint_root"
+
+# === Provenance ===
+
+# Where the fix actually landed in arc. Required so a future curator can
+# re-derive `canonical_fix` if the file structure shifts.
+relevant_arc_pr: "arc#NNN"
+relevant_arc_commit: "0000000000000000000000000000000000000000"
+
+# === Optional fields ===
+
+# Free-form curator notes.
+notes: |
+  Why this is in the fixture set:
+  - Spec + JSON schema + Rust impl all touched — a strong test of cross-section
+    retrieval (docs-spec-retrieval + code-retrieval categories together).
+  - The failure message is generic ("got undefined") — a hard test of whether
+    retrieval can disambiguate from the surrounding test name.
+  - Fix straddles docs/ and crates/, the kind of split that often confuses
+    naive rerankers that prefer either prose or code, not both.
+
+# Edge-case behaviors per PHASE-0.md "Conformance-harness-recall edge cases":
+#
+# - For **spec-only fixes** (no code change), include the spec/doc files only.
+#   Recall scoring still applies; the eval pressures retrieval to surface the
+#   canonical doc in top-3.
+#
+# - For **inconclusive PRs** where canonical_fix can't be cleanly identified
+#   (sweeping refactor, multiple unrelated bugs in one PR), DROP the fixture
+#   rather than guess. PHASE-0.md is explicit on this.

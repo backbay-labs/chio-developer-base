@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# uv — per PR #599 convention, lockfiles are ignored
+.venv/
+chio-pack/uv.lock
+kb-engine/uv.lock
+
+# Local secrets (track only `.env.example`)
+.env
+.env.local
+*.local
+
+# CocoIndex runtime state (Phase 1)
+.cocoindex/
+
+# Obsidian per-user state.
+# Canonical Obsidian config (community-plugins.json, themes, snippets) lives in
+# vault/.obsidian/ once Phase 3 lands and IS tracked. The files below are
+# per-user / per-machine state that should NOT round-trip through git.
+vault/.obsidian/workspace.json
+vault/.obsidian/workspace-mobile.json
+vault/.obsidian/cache
+vault/.obsidian/graph.json
+vault/.obsidian/app.json
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+.vscode/settings.json

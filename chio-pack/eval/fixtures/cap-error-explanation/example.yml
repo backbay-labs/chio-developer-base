@@ -1,0 +1,104 @@
+# Example capability-error-explanation fixture (Eval 4, subjective).
+#
+# Copy this file to a real fixture name (e.g., revoked-cap-still-presented.yml)
+# and replace placeholder values. The runner ignores files with `_example: true`.
+#
+# See chio-pack/eval/PHASE-0.md "Eval 4" and chio-pack/eval/rubrics.md for the
+# 4-dimension rubric raters score against (clarity, accuracy, actionability, brevity).
+
+_example: true
+
+# === Identity ===
+
+# Stable kebab-case ID. Used for run logs and rater UI.
+id: example-cap-error-id
+
+# Provenance — arc PR or issue where this scenario was observed in the wild.
+source: "arc#PR-NNN"
+
+# === The scenario ===
+
+# Free-form prose. Describes the runtime situation the agent encounters AND
+# the raw kernel error that gets surfaced. Both are inputs to the rater.
+# Keep this < 200 words; longer scenarios fatigue raters and pollute scores.
+scenario: |
+  Agent presents a delegated capability that was revoked 2 minutes ago.
+  Kernel returns:
+
+      RevocationCheck: capability rejected (revocation list version 47)
+
+  Agent has no prior context about this capability's revocation status.
+
+# A retrieval query that approximates what the agent (or a curious dev) would
+# ask the KB at this moment. Used to drive the kb_brief_feature augmentation.
+context_query: "RevocationCheck capability rejected revocation list"
+
+# === Augmentations under test ===
+#
+# The rater scores each augmentation independently. The four below are the
+# canonical Phase 0 set; do not add a fifth without an ADR — the human-rating
+# protocol gets unstable past four conditions per scenario.
+#
+# `body` is a static string the rater sees verbatim.
+# `body_source` is a runtime spec — the runner generates the body by invoking
+# the named tool with the given args, then materializes it into the fixture
+# at run time. Either `body` or `body_source` is required, not both.
+
+augmentations_under_test:
+  - name: raw
+    # The control. The naked kernel error, no augmentation.
+    body: "RevocationCheck: capability rejected (revocation list version 47)"
+
+  - name: kb_brief_feature
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability revocation"
+        focus_paths:
+          - "crates/chio-kernel/src/kernel/delegation.rs"
+          - "crates/chio-kernel/src/revocation_store.rs"
+
+  - name: kb_brief_feature + signed_receipt
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability revocation"
+        focus_paths:
+          - "crates/chio-kernel/src/kernel/delegation.rs"
+        include_signed_receipt: true
+
+  - name: kb_brief_feature + episode_link
+    body_source:
+      tool: kb_brief_feature
+      args:
+        feature: "capability revocation"
+        focus_paths:
+          - "crates/chio-kernel/src/kernel/delegation.rs"
+        include_episode_link: "episode.capability-revocation-architecture"
+
+# === Optional: rubric overrides ===
+#
+# Most fixtures use the canonical rubric in chio-pack/eval/rubrics.md.
+# A scenario that genuinely requires a different scoring emphasis can override
+# the dimension weights here. USE SPARINGLY — heterogeneous weights make
+# cross-fixture aggregates noisy. Document the why in `notes:` below.
+
+rubric_overrides: {}
+# Example (commented):
+# rubric_overrides:
+#   weights:
+#     clarity:       1.5  # this scenario hinges on the rater understanding the failure
+#     accuracy:      1.0
+#     actionability: 1.0
+#     brevity:       0.5  # very long context is acceptable here
+
+# === Curator notes ===
+
+notes: |
+  Why this scenario is in the fixture set:
+  - It tests retrieval-augmented explanation across crates + spec + episode-memory.
+  - The "raw" baseline is genuinely confusing — engineers in the wild reported
+    not knowing whether to retry, refresh credentials, or escalate.
+  - The signed_receipt augmentation is included because Phase 2B should make
+    the receipt itself part of the explanation; this fixture is a test of
+    whether that pays off in human comprehension.

@@ -1,0 +1,98 @@
+# Example time-to-first-correct-fix fixture.
+#
+# Copy this file to a real fixture name (e.g., revoke-cross-issuer-2026-03-12.yml)
+# and replace placeholder values. The runner ignores files with `_example: true`,
+# so this template won't be counted toward fixture_count_min.
+#
+# See chio-pack/eval/PHASE-0.md "Eval 1" for the field reference and the
+# fixture-harvesting heuristic for picking real bugs to seed the set.
+
+_example: true
+
+# === Identity ===
+
+# Stable kebab-case ID. Used for run logs and result correlation.
+# Convention: <bug-slug>-<YYYY-MM-DD>
+id: example-bug-id-YYYY-MM-DD
+
+# One-sentence human-readable description.
+title: "Example title — describe the bug in one sentence"
+
+# Provenance. arc PR or issue. Required so a curator can review.
+source: "arc#PR-NNN"
+
+# === Reproduction state ===
+
+# The commit just BEFORE the fix landed (so the failing test reproduces).
+arc_commit_before: "0000000000000000000000000000000000000000"
+
+# The commit AFTER the fix (used by the runner to compare patch_signature
+# and as a sanity check that the fix exists in arc history).
+arc_commit_after:  "0000000000000000000000000000000000000000"
+
+# === Agent configuration ===
+
+agent:
+  # codex-cli | claude-code | cursor — must be supported by the runner.
+  runner: codex-cli
+
+  # Model identifier passed to the agent runner.
+  model: claude-opus-4-7
+
+  # Wall-clock budget. Score decays linearly to zero as time approaches budget.
+  budget_seconds: 1800
+
+  # Tool-call budget. Same decay shape with weight tool_call_weight.
+  budget_tool_calls: 100
+
+# === Initial state seeded into the agent ===
+
+seed_state:
+  # Branch the runner checks out before invoking the agent.
+  # Format: <base-branch>@<commit-sha>. The @<sha> guard prevents drift.
+  starting_branch: "main@0000000000000000000000000000000000000000"
+
+  # The test that's failing on starting_branch. Agent's job is to make it pass.
+  # Format depends on language:
+  #   Python:  path/to/test.py::test_function_name
+  #   JS/TS:   path/to/test.test.ts:test_name_string
+  #   Rust:    crate-name::module::test_function_name
+  failing_test: "tests/conformance/peers/python/test_example.py::test_cross_issuer"
+
+# === What "correct" means ===
+
+expected:
+  # A short string that MUST appear in the agent's diff. Used as a coarse
+  # check that the agent edited the right area; not a full correctness proof.
+  # Pick a phrase from the canonical fix that's unlikely to appear by accident.
+  patch_signature: "expected text from the canonical fix"
+
+  # Every test in this list must pass after the agent's patch. Includes the
+  # failing_test plus any related tests that should also pass once fixed.
+  tests_must_pass:
+    - "tests/conformance/peers/python/test_example.py::test_cross_issuer"
+    # - tests/conformance/peers/js/test_example.test.ts:test_cross_issuer_basic
+
+# === Scoring ===
+
+scoring:
+  # Weights must sum to 1.0. Time and tool-call usage decay the score.
+  time_weight: 0.6
+  tool_call_weight: 0.4
+
+  # Conditions that force score = 0.0 regardless of time/tool-call performance.
+  # The runner evaluates these AFTER the agent declares done or budget expires.
+  zero_score_if:
+    - "any expected test still failing"
+    - "patch deletes any existing test"
+
+# === Optional fields (curator notes) ===
+
+# Free-form notes for curators. Not consumed by the runner.
+notes: |
+  Why this bug is in the fixture set:
+  - It tests retrieval-augmented reasoning across spec + crates + tests.
+  - The canonical fix touches docs/standards as well as crates — a good test
+    of whether the agent searches docs/spec, not just code.
+  - Confidence: medium. Originally harvested by harvest-conformance-fixtures.py
+    with confidence=medium and curated to high after manual review on YYYY-MM-DD.
