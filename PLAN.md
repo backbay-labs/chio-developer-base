@@ -161,10 +161,19 @@ chio-developer-base/
 │   ├── playbooks/                   ← runbooks: revoke a capability, ship a release, debug a guard
 │   └── daily/                       ← YYYY-MM-DD daily notes
 │
-├── obsidian/                        ← .obsidian/ committed: workspace, theme, allowlist
-│   ├── community-plugins.json       ← exact pinned set (see "Vault" below)
-│   ├── snippets/
-│   └── workspace.json
+│   ├── .obsidian/                   ← committed: pinned plugin set, snippets, theme settings
+│   │   ├── community-plugins.json   ← exact pinned set
+│   │   ├── core-plugins.json
+│   │   ├── appearance.json
+│   │   ├── plugins/
+│   │   │   ├── dataview/data.json   ← canonical defaults for shipped plugins
+│   │   │   ├── templater-obsidian/data.json
+│   │   │   ├── periodic-notes/data.json
+│   │   │   ├── obsidian-tasks-plugin/data.json
+│   │   │   ├── obsidian-git/data.json
+│   │   │   └── episode-promoter/    ← custom plugin source (Phase 3)
+│   │   └── snippets/
+│   │       └── chio-callouts.css
 │
 ├── infra/
 │   ├── postgres/init/001-vector.sql
@@ -420,7 +429,7 @@ These exist to gate the carve-out's value, not just retrieval quality.
 
 | # | Task | Done when |
 |---|------|-----------|
-| 3.1 | `obsidian/community-plugins.json` pinned set: Dataview, Templater, Obsidian Git, Excalidraw, Tasks, Periodic Notes, Iconize, Style Settings | Allowlist enforced by CI |
+| 3.1 | `vault/.obsidian/community-plugins.json` pinned set: Dataview, Templater, Obsidian Git, Excalidraw, Tasks, Periodic Notes, Iconize, Style Settings | Allowlist enforced by CI |
 | 3.2 | Templates: daily-note, ADR, episode, spec | `Cmd+P > Templater: insert` produces valid frontmatter |
 | 3.3 | Dataview queries: stale-specs (`last-validated > 90d`), open-ADRs, unowned-capabilities | Each renders correctly on real vault content |
 | 3.4 | Three Excalidraw diagrams, committed: capability lifecycle, receipt commitment chain, release qualification flow | Linked from `_meta/diagrams.md` |

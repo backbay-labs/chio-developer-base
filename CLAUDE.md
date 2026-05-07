@@ -12,6 +12,6 @@
 ## Don't
 
 - Don't run `make kb-reset` without explicit user confirmation. It drops Postgres tables and clears Neo4j Chio nodes.
-- Don't add Obsidian community plugins outside the pinned set in `obsidian/community-plugins.json`. Plugin choices are an ADR-level decision.
+- Don't add Obsidian community plugins outside the pinned set in `vault/.obsidian/community-plugins.json`. Plugin choices are an ADR-level decision.
 - Don't write directly to `vault/decisions/ADR-*.md` to mark `Accepted`. Acceptance happens via PR review with the ADR's named owners.
 - Don't add new top-level vault folders. The 7 in PLAN.md (`_meta/`, `spec/`, `crates/`, `decisions/`, `episodes/`, `playbooks/`, `daily/`) are fixed. An eighth requires an ADR.

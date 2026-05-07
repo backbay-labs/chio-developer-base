@@ -1,0 +1,48 @@
+/*
+ * Chio-themed callouts
+ *
+ * Usage in markdown:
+ *   > [!normative]
+ *   > A capability MUST be revocable within the revocation window.
+ *
+ *   > [!receipt]
+ *   > Every revocation emits receipt.revoke-v1.<CAP_ID>.audit.
+ *
+ *   > [!capability]
+ *   > Scopes are namespaced by issuer.
+ *
+ *   > [!guard]
+ *   > guard.revocation-window evaluates fail-closed under partition.
+ *
+ *   > [!warning-staleness]
+ *   > This spec has not been re-validated in 90+ days.
+ *
+ * Each callout type matches a Chio concept and uses an icon + color
+ * intended to be recognizable across the vault. The color values match
+ * the appearance.json accentColor for thematic consistency.
+ */
+
+.callout[data-callout="normative"] {
+  --callout-color: 96, 84, 167;
+  --callout-icon: lucide-shield-check;
+}
+
+.callout[data-callout="receipt"] {
+  --callout-color: 47, 133, 90;
+  --callout-icon: lucide-receipt;
+}
+
+.callout[data-callout="capability"] {
+  --callout-color: 184, 119, 51;
+  --callout-icon: lucide-key;
+}
+
+.callout[data-callout="guard"] {
+  --callout-color: 209, 84, 81;
+  --callout-icon: lucide-shield;
+}
+
+.callout[data-callout="warning-staleness"] {
+  --callout-color: 217, 145, 36;
+  --callout-icon: lucide-clock-alert;
+}

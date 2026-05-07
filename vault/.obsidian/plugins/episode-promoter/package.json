@@ -1,0 +1,22 @@
+{
+  "name": "episode-promoter",
+  "version": "0.0.1",
+  "description": "Custom Obsidian plugin for chio-developer-base. Promote daily-note 'What I learned' sections into Graphiti episode candidates.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production",
+    "version": "node version-bump.mjs && git add manifest.json versions.json"
+  },
+  "keywords": ["obsidian", "plugin", "chio", "graphiti", "episode-promoter"],
+  "author": "Backbay",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.20.0",
+    "obsidian": "latest",
+    "tslib": "^2.6.0",
+    "typescript": "^5.4.0"
+  }
+}

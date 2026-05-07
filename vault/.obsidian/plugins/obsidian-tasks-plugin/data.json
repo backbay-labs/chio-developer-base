@@ -1,0 +1,13 @@
+{
+  "globalQuery": "",
+  "globalFilter": "",
+  "taskFormat": "tasksPluginEmoji",
+  "removeGlobalFilterOnTaskListItem": true,
+  "setCreatedDate": true,
+  "setDoneDate": true,
+  "useFilenameAsScheduledDate": false,
+  "presets": {
+    "owned-by-me-and-not-done": "(description includes @<your-handle>) AND not done",
+    "phase-0-tasks": "(path includes decisions/ADR-0002) AND not done"
+  }
+}
