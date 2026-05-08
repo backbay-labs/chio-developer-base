@@ -12,6 +12,24 @@ last-validated: 2026-05-07
 
 > How a second team (platform / opus / alpha / …) brings up the chio-developer-base stack against their own repo. This playbook exists because [[../decisions/ADR-0001-repo-graduation|ADR-0001]]'s "graduate" outcome is gated on a real second adopter — *with working code*, not a verbal commit.
 
+## Current readiness (v0.1.x)
+
+Honest state of what's ready vs. rough at the time you read this. Update when the surfaces below mature.
+
+| Surface | Ready | Notes |
+| --- | --- | --- |
+| `kb-engine` plugin contract (4 hooks + Registry) | ✓ | Protocols stable; tests cover dispatch + boundary |
+| `chio-pack` as plugin (entry point) | ✓ | Loads via `Registry.load_entry_points()` |
+| `chio-dev` CLI (`status`, `up`, `down`, `ingest`, `sync`, `query`, `session`, `eval`, `dogfood`, `migrate-seeds`) | ✓ | Click-based; lazy-imports backing-store deps |
+| Engine ↔ pack boundary (CI-enforced) | ✓ | `ops/ci/check-imports.py` + AST unit test |
+| Phase 0 outcome eval fixtures (38 total) | ✓ | All four evals fixture-complete |
+| Phase 0 runners (4 modules) | ✓ scaffold | Return `blocked-input` until real input pipelines (Phase 1.5+ sessions, Phase 1.x KB stack); ADR-0002 baselines pending |
+| `make kb-up` docker stack | ⚠ syntax-validated, not exercised in CI | Compose config validates; bringing it up needs a docker daemon |
+| pgvector / Neo4j ingest | ⚠ wired with FakeEmbedder | `chio-dev ingest --no-postgres --no-neo4j` works without infra; full path needs OPENAI_API_KEY + live stack |
+| Vault-sync daemon (frontmatter → DerivedRecords) | ⚠ one-shot works; watch mode lazy | `chio-dev sync` one-shot writes to JsonlRouter audit log; production GraphitiHttpRouter is Phase 1.4+ |
+| `chio-kb-mcp` real gateway (10 `kb_*` tools) | ✗ stub only | Phase 1.3+ deliverable; today the docker container runs a /health stub |
+| Federated cross-repo queries | ✗ explicitly out of scope for v1 | Per [PLAN.md](../../PLAN.md) "Non-goals" |
+
 ## When this playbook applies
 
 You should adopt chio-developer-base when:
@@ -48,25 +66,16 @@ Don't split the difference. Mixing your concepts into chio-pack pollutes the eng
 
 > Skip to step 2B if you chose 1B.
 
-Edit `chio-developer-base/sources.toml` (Phase 1 file; placeholder shown):
-
-```toml
-[sources.<your-repo>]
-path = "../<relative-path-to-your-repo>"
-pack = "chio"
-include = ["src/", "docs/", "spec/"]
-exclude = ["target/", "node_modules/"]
-```
-
-Run:
+The v0.1.x path doesn't yet have `sources.toml` — that's Phase 1.x indexing-pipeline config. Today the `chio-dev ingest` CLI takes a source-root argument directly:
 
 ```sh
-make kb-up
-make kb-update
-make kb-eval-retrieval
+chio-dev ingest /path/to/your-repo
+chio-dev ingest /path/to/your-repo --no-postgres --no-neo4j   # dry-run, no infra
 ```
 
-Confirm A-grade retrieval against your repo's content. If it drops below A, the issue is content gaps in your repo (missing docstrings, missing spec anchors), not the engine — push fixes in your repo first.
+The CLI walks the repo, runs the Registry's `SourceIngester` hooks (currently chio-pack's Rust ingester only — your pack adds more in 2B), projects nodes/edges to Neo4j, and chunks code to pgvector. Output is JSON with `files_seen / files_ingested / nodes_upserted / edges_upserted / chunks_inserted`.
+
+When `make kb-up` brings the docker stack live and `make kb-eval-retrieval` lands (Phase 1.x), confirm A-grade retrieval against your repo's content. If it drops below A, the issue is content gaps in your repo, not the engine.
 
 ## Step 2B — New-pack adoption
 
@@ -78,29 +87,38 @@ cd <your-team>-pack
 # update pyproject.toml: name, scripts, package
 ```
 
-The four plugin seams in [`kb_engine.plugin`](../../PLAN.md) you must implement:
+The four plugin protocols in [`kb_engine.plugin`](../../kb-engine/kb_engine/plugin.py) you implement:
 
-| Hook | What you provide | Reference: chio-pack |
-| ---- | ---------------- | -------------------- |
-| `SourceIngester(file_path)` | Decide if/how to index a file in your repo | `chio_pack/projectors/rust.py` |
-| `GraphProjector(parsed)` | Emit your nodes + edges using your vocabulary | `chio_pack/schema.py` defines node types; the projector emits them |
-| `ToolRegistrar(server)` | Declare your domain-specific MCP tools | `chio_pack/tools/` (the 10 `kb_*` tools register here) |
-| `FrontmatterHandler(type, frontmatter)` | Decide how a vault-note `type:` is materialized | `chio_pack/frontmatter.py` |
+| Hook | Signature | Reference (chio-pack) |
+| ---- | --------- | --------------------- |
+| `SourceIngester` | `(file_path) -> ParsedFile \| None` | [`chio_pack.plugin.rust_source_ingester`](../../chio-pack/chio_pack/plugin.py) |
+| `GraphProjector` | `(parsed) -> Iterable[Node \| Edge]` | [`chio_pack.plugin.chio_graph_projector`](../../chio-pack/chio_pack/plugin.py) |
+| `ToolRegistrar` | `(server) -> None` | [`chio_pack.plugin.chio_tool_registrar`](../../chio-pack/chio_pack/plugin.py) (stub today) |
+| `FrontmatterHandler` | `(type, frontmatter) -> Iterable[DerivedRecord]` | [`chio_pack.plugin.chio_frontmatter_handler`](../../chio-pack/chio_pack/plugin.py) |
 
-Define your **schema** in `<your-team>_pack/schema.py`:
+Define your **schema** in `<your-team>_pack/schema.py`. Match chio-pack's pattern — namespaced string labels and edge types as module constants:
 
 ```python
-from kb_engine.schema import Label, Edge
-
 # Example for a hypothetical platform-pack:
-PlatformService     = Label("PlatformService")
-PlatformDeployment  = Label("PlatformDeployment")
+SERVICE = "PlatformService"
+DEPLOYMENT = "PlatformDeployment"
 
-DEPLOYS  = Edge("DEPLOYS",  PlatformService, PlatformDeployment)
-DEPENDS  = Edge("DEPENDS",  PlatformService, PlatformService)
+DEPLOYS = "DEPLOYS"
+DEPENDS = "DEPENDS"
 ```
 
+Then your projector emits `Node(label=SERVICE, ...)` and `Edge(relationship=DEPLOYS, ...)`.
+
 Critical rule: **your labels and edges use your team's prefix** (`Platform*`, `Opus*`). Do not reuse `Chio*` labels even if a concept "feels similar." Namespacing keeps cross-pack queries possible without semantic collisions.
+
+Wire your `register(registry)` entry point in `pyproject.toml`:
+
+```toml
+[project.entry-points."kb_engine.plugins"]
+platform = "platform_pack.plugin"
+```
+
+Then `Registry.load_entry_points()` finds it automatically alongside chio-pack.
 
 ## Step 3 — Outcome evals for your pack
 
