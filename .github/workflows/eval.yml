@@ -1,14 +1,21 @@
 name: eval
 
-# Phase 0 stub. Closes the loop on issue #5 (CI as regression gate) but is
-# intentionally non-blocking until ADR-0002 commits the four outcome-eval
-# baselines. Once those land, flip `continue-on-error: false` and the gate
-# becomes real.
+# Phase 0 / Phase 1.2 partial-flip per issue #5.
 #
-# The retrieval eval (PR #599's 9-category A floor) is NOT wired here — it
-# requires the docker stack (Phase 1.1+) and runs via `make kb-eval-retrieval`
-# inside the chio-kb-mcp container. Add it to this workflow once the stack
-# brings up cleanly in CI.
+# BLOCKING gates (continue-on-error: false / unset — fail the build):
+#   - Engine ↔ pack boundary (ops/ci/check-imports.py)
+#   - kb-engine unit tests (plugin protocols, registry dispatch)
+#   - chio-pack unit tests (boundary AST check, fixture schema, plugin
+#     registration, heuristic classifier, session log)
+#
+# INFORMATIONAL gates (continue-on-error: true — comment, don't fail):
+#   - make kb-eval-outcomes (returns blocked-input until ADR-0002
+#     baselines exist; flip continue-on-error: false here when baselines
+#     land — that's the final close-out of issue #5).
+#
+# The retrieval eval (PR #599's 9-category A floor) is NOT wired here.
+# It requires the docker stack to be running in CI. Add via
+# `make kb-eval-retrieval` once kb-up is reproducible in the runner.
 
 on:
   pull_request:
@@ -22,7 +29,7 @@ permissions:
 
 jobs:
   outcomes:
-    name: Outcome evals (Phase 0 — non-blocking)
+    name: Outcome evals + boundary + unit tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,19 +40,40 @@ jobs:
         with:
           enable-cache: true
           # uv.lock files are gitignored per PR #599 convention; key the cache
-          # off pyproject.toml instead so the cache still works.
+          # off pyproject.toml instead.
           cache-dependency-glob: |
             **/pyproject.toml
 
+      # === BLOCKING gates ===
+
       - name: Engine ↔ pack boundary check
-        # Hard rule #3 from AGENTS.md: kb-engine cannot import chio_*.
-        # Fails the build (no continue-on-error) — this rule is non-negotiable.
+        # Hard rule #3 (AGENTS.md): kb-engine cannot import chio_*.
         run: python3 ops/ci/check-imports.py
 
-      - name: Run outcome evals
+      - name: kb-engine unit tests
+        # Plugin protocol contracts, registry dispatch, dataclass behavior.
+        run: |
+          cd kb-engine
+          uv sync --group dev
+          uv run python -m pytest tests/ -v
+
+      - name: chio-pack unit tests
+        # Fixture schema validation (test_runners), AST-level boundary
+        # check (test_plugin), plugin registration end-to-end,
+        # heuristic mistake classifier, session log writer.
+        run: |
+          cd chio-pack
+          uv sync --group dev
+          uv run python -m pytest tests/ -v
+
+      # === INFORMATIONAL gates ===
+
+      - name: Run outcome evals (Phase 0 — non-blocking)
         id: eval
-        # Phase 0: the runner reports "blocked-fixtures" / "blocked-runner" and
-        # exits 1 by design. Don't fail the build for that expected state.
+        # Runners return blocked-input until ADR-0002 baselines exist
+        # (Phase 1.x agent-runner spawning, KB-stack-running kb_search,
+        # rater-pool sign-off). Flip continue-on-error: false when the
+        # report shows status: ok across all four evals.
         continue-on-error: true
         run: make kb-eval-outcomes
 
