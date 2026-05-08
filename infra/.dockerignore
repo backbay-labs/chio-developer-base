@@ -1,0 +1,27 @@
+# Anything under .obsidian/ is per-user vault state — don't include in build context
+.obsidian/
+
+# Vault content is mounted at runtime, not baked into the image
+vault/
+
+# Python build/runtime artifacts
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.venv/
+**/uv.lock
+**/node_modules/
+
+# Don't bake the docker stack into itself
+infra/
+
+# Decisions / planning are read at runtime via the vault mount
+decisions/
+.planning/
+
+# Tests not needed in the runtime image
+**/tests/
+
+# Git metadata
+.git/
+.github/

@@ -1,0 +1,15 @@
+# Graphiti MCP config for chio-developer-base.
+#
+# Group ID isolates this project's episodes from any other Graphiti
+# instance sharing the same Neo4j. Telemetry off by default per the
+# kb-upgrade-decision episode (curated seeds only; nothing user-content
+# leaves the local stack without explicit opt-in).
+
+group_id: chio-repo
+
+telemetry:
+  enabled: false
+
+# Phase 1.x will define the curated episode-type vocabulary here so
+# Graphiti's typed edges align with chio_pack/schema.py. For now this
+# config stays minimal.
