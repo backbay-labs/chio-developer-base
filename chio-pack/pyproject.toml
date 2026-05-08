@@ -1,12 +1,19 @@
 [project]
 name = "chio-pack"
-version = "0.1.0"
+version = "0.2.0"
 description = "Chio-specific schema, MCP tools, and outcome evals for chio-developer-base"
 requires-python = ">=3.11"
 authors = [{ name = "Backbay" }]
 dependencies = [
     "pyyaml>=6.0",
+    "kb-engine",
 ]
+
+[project.entry-points."kb_engine.plugins"]
+chio = "chio_pack.plugin"
+
+[tool.uv.sources]
+kb-engine = { path = "../kb-engine", editable = true }
 
 [project.scripts]
 # Phase 0+: outcome eval runner (skeleton; runners are Phase 1).
