@@ -7,6 +7,7 @@ authors = [{ name = "Backbay" }]
 dependencies = [
     "pyyaml>=6.0",
     "kb-engine",
+    "click>=8.1",
 ]
 
 [project.entry-points."kb_engine.plugins"]
@@ -16,7 +17,10 @@ chio = "chio_pack.plugin"
 kb-engine = { path = "../kb-engine", editable = true }
 
 [project.scripts]
-# Phase 0+: outcome eval runner (skeleton; runners are Phase 1).
+# Phase 1.5: developer CLI — wraps make targets + session_log + ingest.
+chio-dev = "chio_pack.cli:main"
+
+# Phase 0+: outcome eval runner.
 chio-pack-eval = "chio_pack.eval.runner:main"
 
 # Phase 2A: PR-impact gate backtest. Stub that exits with a clear blocker.

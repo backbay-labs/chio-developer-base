@@ -1,0 +1,322 @@
+"""chio-dev CLI — Phase 1.5 developer wrapper.
+
+Subcommands:
+
+  status            print make kb-status
+  up / down         start/stop the docker stack
+  ingest [SRC]      run kb_engine.IngestPipeline against a source root
+  query <Q>         retrieve top-K via pgvector similarity (Phase 1.3+)
+  sync [VAULT]      run vault-sync daemon (one-shot by default; --watch for forever)
+  migrate-seeds     convert arc PR #599 graphiti seeds → vault/episodes
+  eval              shell: make kb-eval-outcomes
+  dogfood           shell: make kb-dogfood
+  session start     emit a `tool_call`/`edit`/`test_run`/`mistake` from CLI
+  session show      print recent session log
+
+Most subcommands either shell out to the relevant Makefile target OR
+delegate to a Python module that already exists. The CLI's job is
+discovery — `chio-dev --help` is the entrypoint a new dev finds before
+they read PLAN.md.
+
+Per AGENTS.md hard rules, every action that would write to Graphiti
+goes through the vault-sync daemon. The CLI never bypasses that.
+"""
+from __future__ import annotations
+
+import json
+import os
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+
+import click
+
+
+REPO_ROOT_HINT = "Run from the chio-developer-base/ root (or set CHIO_DEV_REPO)."
+
+
+def _repo_root() -> Path:
+    """Best-effort repo root detection. Walk up looking for PLAN.md + Makefile."""
+    env = os.environ.get("CHIO_DEV_REPO")
+    if env:
+        return Path(env).resolve()
+    here = Path.cwd()
+    for candidate in [here, *here.parents]:
+        if (candidate / "PLAN.md").exists() and (candidate / "Makefile").exists():
+            return candidate
+    return here
+
+
+def _shell(cmd: str | list[str], *, cwd: Path | None = None, check: bool = True) -> int:
+    """Run a shell command; relay stdout/stderr to the user's terminal."""
+    if isinstance(cmd, list):
+        printable = " ".join(shlex.quote(c) for c in cmd)
+    else:
+        printable = cmd
+    click.secho(f"$ {printable}", fg="blue", err=True)
+    res = subprocess.run(
+        cmd if isinstance(cmd, list) else cmd,
+        shell=isinstance(cmd, str),
+        cwd=str(cwd) if cwd else None,
+        check=False,
+    )
+    if check and res.returncode != 0:
+        sys.exit(res.returncode)
+    return res.returncode
+
+
+@click.group()
+@click.version_option()
+def main() -> None:
+    """chio-dev — Chio knowledge-base developer CLI.
+
+    Repo-rooted at the directory containing PLAN.md + Makefile, or the
+    path set in CHIO_DEV_REPO.
+    """
+
+
+# === Stack lifecycle ===
+
+
+@main.command()
+def status() -> None:
+    """Run `make kb-status` to see what exists vs. what's expected."""
+    _shell("make kb-status", cwd=_repo_root(), check=False)
+
+
+@main.command()
+def up() -> None:
+    """Bring up the Phase 1.1+ docker stack (`make kb-up`)."""
+    _shell("make kb-up", cwd=_repo_root())
+
+
+@main.command()
+def down() -> None:
+    """Stop the docker stack (`make kb-down`)."""
+    _shell("make kb-down", cwd=_repo_root(), check=False)
+
+
+# === Eval / dogfood ===
+
+
+@main.command()
+def eval() -> None:
+    """Run the outcome-eval suite (`make kb-eval-outcomes`)."""
+    _shell("make kb-eval-outcomes", cwd=_repo_root(), check=False)
+
+
+@main.command()
+def dogfood() -> None:
+    """Regenerate `DOGFOOD-REVIEW.md` (`make kb-dogfood`). Phase 1.x."""
+    _shell("make kb-dogfood", cwd=_repo_root(), check=False)
+
+
+# === Vault operations ===
+
+
+@main.command()
+@click.argument("seeds_dir", required=False)
+@click.option("--vault", default="vault", help="Path to vault/ root (default: vault)")
+@click.option("--branch", default="HEAD", help="Provenance label for imported_from")
+def migrate_seeds(seeds_dir: str | None, vault: str, branch: str) -> None:
+    """One-shot: convert arc PR #599 seeds/graphiti/*.json → vault/episodes/*.md.
+
+    SEEDS_DIR defaults to ../arc/ops/knowledge-base/seeds/graphiti.
+    """
+    repo = _repo_root()
+    seeds = seeds_dir or str(repo.parent / "arc" / "ops" / "knowledge-base" / "seeds" / "graphiti")
+    cmd = [
+        sys.executable, str(repo / "ops" / "scripts" / "migrate-seeds.py"),
+        "--seeds", seeds,
+        "--vault", str(repo / vault),
+        "--branch", branch,
+    ]
+    _shell(cmd, cwd=repo, check=False)
+
+
+@main.command()
+@click.argument("vault_path", required=False)
+@click.option("--watch", is_flag=True, help="Run forever (watchdog/polling).")
+@click.option("--state", default=None, help="Path to sync state JSON (default: ~/.chio-dev/vault-sync.state.json)")
+def sync(vault_path: str | None, watch: bool, state: str | None) -> None:
+    """Run the vault-sync daemon. One-shot by default; --watch for forever.
+
+    VAULT_PATH defaults to <repo>/vault.
+    """
+    repo = _repo_root()
+    vault_root = Path(vault_path) if vault_path else repo / "vault"
+    state_path = Path(state) if state else Path.home() / ".chio-dev" / "vault-sync.state.json"
+
+    from kb_engine import Registry
+    from kb_engine.sync import JsonlRouter, NullRouter, VaultSyncDaemon
+
+    registry = Registry()
+    n_loaded = registry.load_entry_points()
+    click.secho(f"Loaded {n_loaded} plugin entry point(s).", fg="green", err=True)
+
+    audit_path = repo / "vault" / "_meta" / "dashboards" / "vault-sync-audit.jsonl"
+    routers = [JsonlRouter(audit_path), NullRouter()]
+
+    daemon = VaultSyncDaemon(registry, routers, state_path=state_path)
+
+    if watch:
+        click.secho(f"Watching {vault_root} (Ctrl+C to stop)…", fg="yellow", err=True)
+        daemon.run_forever(vault_root)
+    else:
+        stats = daemon.run_once(vault_root)
+        click.echo(json.dumps(
+            {
+                "files_seen": stats.files_seen,
+                "files_processed": stats.files_processed,
+                "files_skipped_unchanged": stats.files_skipped_unchanged,
+                "files_skipped_no_frontmatter": stats.files_skipped_no_frontmatter,
+                "records_routed": stats.records_routed,
+                "audit_log": str(audit_path),
+            },
+            indent=2,
+        ))
+
+
+@main.command()
+@click.argument("source_root", required=False)
+@click.option("--no-postgres", is_flag=True, help="Skip embedding/pgvector ingest")
+@click.option("--no-neo4j", is_flag=True, help="Skip graph projection/neo4j")
+def ingest(source_root: str | None, no_postgres: bool, no_neo4j: bool) -> None:
+    """Run the ingest pipeline against a source root (default: ../arc).
+
+    Phase 1.3+ wiring: requires Postgres + Neo4j up and configured via
+    .env (or sets via flags). Without --no-postgres / --no-neo4j, the
+    pipeline tries to connect using POSTGRES_URL / NEO4J_URI from env.
+    """
+    from kb_engine import IngestPipeline, Registry
+
+    repo = _repo_root()
+    src = Path(source_root) if source_root else repo.parent / "arc"
+    if not src.exists():
+        click.secho(f"error: source root {src} does not exist", fg="red", err=True)
+        sys.exit(2)
+
+    registry = Registry()
+    n_loaded = registry.load_entry_points()
+    click.secho(f"Loaded {n_loaded} plugin entry point(s).", fg="green", err=True)
+
+    postgres = None
+    if not no_postgres:
+        url = os.environ.get("POSTGRES_URL")
+        if url:
+            try:
+                from kb_engine.store import PostgresStore
+                postgres = PostgresStore.from_url(url)
+                postgres.bootstrap()
+            except RuntimeError as e:
+                click.secho(f"warning: postgres unavailable: {e}", fg="yellow", err=True)
+
+    neo4j_store = None
+    if not no_neo4j:
+        uri = os.environ.get("NEO4J_URI")
+        user = os.environ.get("NEO4J_USER", "neo4j")
+        password = os.environ.get("NEO4J_PASSWORD", "demodemo")
+        if uri:
+            try:
+                from kb_engine.store import Neo4jStore
+                neo4j_store = Neo4jStore.from_url(uri, user, password)
+            except RuntimeError as e:
+                click.secho(f"warning: neo4j unavailable: {e}", fg="yellow", err=True)
+
+    embedder = None
+    if postgres:
+        from kb_engine.store import FakeEmbedder, OpenAIEmbedder
+
+        if os.environ.get("OPENAI_API_KEY"):
+            embedder = OpenAIEmbedder()
+            click.secho("Using OpenAI embedder.", fg="green", err=True)
+        else:
+            embedder = FakeEmbedder(dim=postgres.embedding_dim)
+            click.secho(
+                "OPENAI_API_KEY not set; using FakeEmbedder (deterministic, "
+                "no semantic value). Real ingest needs OpenAI key.",
+                fg="yellow", err=True,
+            )
+
+    pipeline = IngestPipeline(registry, postgres=postgres, neo4j=neo4j_store, embedder=embedder)
+    click.secho(f"Ingesting {src}…", fg="blue", err=True)
+    stats = pipeline.ingest_tree(src)
+    click.echo(json.dumps(
+        {
+            "files_seen": stats.files_seen,
+            "files_ingested": stats.files_ingested,
+            "nodes_upserted": stats.nodes_upserted,
+            "edges_upserted": stats.edges_upserted,
+            "chunks_inserted": stats.chunks_inserted,
+        },
+        indent=2,
+    ))
+
+
+@main.command()
+@click.argument("query")
+@click.option("--limit", default=10)
+def query(query: str, limit: int) -> None:
+    """Phase 1.3+ retrieval. Today, calls pgvector similarity search."""
+    from kb_engine.store import OpenAIEmbedder, PostgresStore
+
+    url = os.environ.get("POSTGRES_URL")
+    if not url:
+        click.secho("error: POSTGRES_URL not set", fg="red", err=True)
+        sys.exit(2)
+    if not os.environ.get("OPENAI_API_KEY"):
+        click.secho("error: OPENAI_API_KEY not set (required to embed query)", fg="red", err=True)
+        sys.exit(2)
+
+    try:
+        store = PostgresStore.from_url(url)
+        embedder = OpenAIEmbedder()
+        vec = embedder([query])[0]
+        results = store.search_similar(vec, limit=limit)
+        click.echo(json.dumps(results, indent=2, default=str))
+    except RuntimeError as e:
+        click.secho(f"error: {e}", fg="red", err=True)
+        sys.exit(2)
+
+
+# === Session log ===
+
+
+@main.group()
+def session() -> None:
+    """Manage chio-dev session logs (~/.chio-dev/sessions/*.jsonl).
+
+    Sessions are the input to the repeated-mistake-rate eval (Eval 2).
+    """
+
+
+@session.command("show")
+def session_show() -> None:
+    """Print the current session's path and last 20 events."""
+    from chio_pack.eval import session_log
+
+    path = session_log.session_path()
+    click.echo(str(path))
+    if path.exists():
+        events = session_log.load_session(path)[-20:]
+        for ev in events:
+            click.echo(json.dumps(ev))
+
+
+@session.command("tool-call")
+@click.option("--tool", required=True)
+@click.option("--args", default="{}")
+@click.option("--result-ids", default="")
+def session_tool_call(tool: str, args: str, result_ids: str) -> None:
+    """Manually record a tool_call event (mostly for testing the harness)."""
+    from chio_pack.eval import session_log
+
+    parsed_args = json.loads(args) if args else {}
+    rids = [s for s in result_ids.split(",") if s]
+    session_log.tool_call(tool=tool, args=parsed_args, result_ids=rids)
+    click.secho(f"Recorded tool_call: {tool}", fg="green", err=True)
+
+
+if __name__ == "__main__":
+    main()
