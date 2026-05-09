@@ -51,3 +51,126 @@ def test_session_tool_call_writes_event(tmp_path, monkeypatch):
     content = sessions[0].read_text()
     assert "kb_search_code" in content
     assert '"q": "x"' in content
+
+
+# === init-pack appears in --help ===
+
+
+def test_init_pack_listed_in_help():
+    runner = CliRunner()
+    result = runner.invoke(main, ["--help"])
+    assert result.exit_code == 0
+    assert "init-pack" in result.output
+
+
+# === ingest --sources dispatch ===
+
+
+def _extract_json_payload(output: str) -> dict:
+    """Pull the trailing JSON payload from CliRunner mixed stdout.
+
+    `chio-dev ingest` writes status to stderr (which CliRunner mixes
+    into stdout by default) and a single multi-line JSON object to
+    stdout. We scan for the first opening `{` whose contents parse
+    cleanly through end-of-output.
+    """
+    import json as _json
+
+    for i, ch in enumerate(output):
+        if ch != "{":
+            continue
+        try:
+            return _json.loads(output[i:])
+        except _json.JSONDecodeError:
+            continue
+    raise AssertionError(f"no JSON payload in CLI output: {output!r}")
+
+
+def test_ingest_sources_visits_each_source_entry(tmp_path, monkeypatch):
+    """`chio-dev ingest --sources sources.toml --no-postgres --no-neo4j`
+    parses the file and walks each [[source]] entry. The output JSON
+    reports per-source stats so we can assert dispatch happened.
+    """
+    src_a = tmp_path / "tree-a"
+    src_b = tmp_path / "tree-b"
+    (src_a / "sub").mkdir(parents=True)
+    (src_b / "sub").mkdir(parents=True)
+    (src_a / "sub" / "lib.rs").write_text("fn a() {}\n")
+    (src_b / "sub" / "lib.rs").write_text("fn b() {}\n")
+    cfg = tmp_path / "sources.toml"
+    cfg.write_text(
+        f'''
+        [[source]]
+        pack = "chio"
+        root = "{src_a}"
+
+        [[source]]
+        pack = "chio"
+        root = "{src_b}"
+        ''',
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        [
+            "ingest",
+            "--sources", str(cfg),
+            "--no-postgres",
+            "--no-neo4j",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = _extract_json_payload(result.output)
+    assert len(payload["sources"]) == 2
+    assert payload["sources"][0]["root"] == str(src_a.resolve())
+    assert payload["sources"][1]["root"] == str(src_b.resolve())
+
+
+def test_ingest_back_compat_positional_root_still_works(tmp_path, monkeypatch):
+    """Without --sources and without a discoverable sources.toml, the
+    positional [SOURCE_ROOT] arg still works (back-compat).
+    """
+    src = tmp_path / "tree"
+    (src / "sub").mkdir(parents=True)
+    (src / "sub" / "lib.rs").write_text("fn a() {}\n")
+    # Run from a directory with NO sources.toml so default lookup fails.
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    # Force CHIO_DEV_REPO so the repo-root sources.toml lookup also
+    # points at a path with no sources.toml (tmp_path again).
+    monkeypatch.setenv("CHIO_DEV_REPO", str(tmp_path))
+    result = runner.invoke(
+        main,
+        [
+            "ingest",
+            str(src),
+            "--no-postgres",
+            "--no-neo4j",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = _extract_json_payload(result.output)
+    assert len(payload["sources"]) == 1
+    assert payload["sources"][0]["root"] == str(src)
+
+
+def test_ingest_rejects_unregistered_pack_in_sources(tmp_path, monkeypatch):
+    src = tmp_path / "tree"
+    src.mkdir()
+    cfg = tmp_path / "sources.toml"
+    cfg.write_text(
+        f'''
+        [[source]]
+        pack = "definitely-not-installed"
+        root = "{src}"
+        ''',
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        ["ingest", "--sources", str(cfg), "--no-postgres", "--no-neo4j"],
+    )
+    assert result.exit_code == 2
+    assert "not registered" in (result.output + (result.stderr or ""))

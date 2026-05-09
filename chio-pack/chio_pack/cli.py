@@ -180,26 +180,81 @@ def sync(vault_path: str | None, watch: bool, state: str | None) -> None:
 
 @main.command()
 @click.argument("source_root", required=False)
+@click.option(
+    "--sources",
+    "sources_path",
+    default=None,
+    help="Path to a sources.toml describing one or more [[source]] entries. "
+         "Falls back to ./sources.toml or <repo>/sources.toml when omitted.",
+)
 @click.option("--no-postgres", is_flag=True, help="Skip embedding/pgvector ingest")
 @click.option("--no-neo4j", is_flag=True, help="Skip graph projection/neo4j")
-def ingest(source_root: str | None, no_postgres: bool, no_neo4j: bool) -> None:
-    """Run the ingest pipeline against a source root (default: ../arc).
+def ingest(
+    source_root: str | None,
+    sources_path: str | None,
+    no_postgres: bool,
+    no_neo4j: bool,
+) -> None:
+    """Run the ingest pipeline.
+
+    Three modes (resolved in order):
+
+      1. `--sources <path>`         — explicit sources.toml.
+      2. `[SOURCE_ROOT]` positional — back-compat, single root, default pack.
+      3. Auto-discovered sources.toml (./sources.toml, then <repo>/sources.toml).
+      4. Final fallback: `<repo>/../arc` against the default pack.
+
+    sources.toml lets a multi-pack adopter point distinct trees at
+    distinct packs in one declarative file. See kb-engine docs for the
+    schema.
 
     Phase 1.3+ wiring: requires Postgres + Neo4j up and configured via
     .env (or sets via flags). Without --no-postgres / --no-neo4j, the
     pipeline tries to connect using POSTGRES_URL / NEO4J_URI from env.
     """
     from kb_engine import IngestPipeline, Registry
+    from kb_engine.config import (
+        ConfigError,
+        SourceConfig,
+        default_sources_path,
+        load_sources_toml,
+    )
 
     repo = _repo_root()
-    src = Path(source_root) if source_root else repo.parent / "arc"
-    if not src.exists():
-        click.secho(f"error: source root {src} does not exist", fg="red", err=True)
-        sys.exit(2)
 
     registry = Registry()
     n_loaded = registry.load_entry_points()
     click.secho(f"Loaded {n_loaded} plugin entry point(s).", fg="green", err=True)
+
+    # Resolve which mode we're in.
+    sources: list[SourceConfig] = []
+    explicit_sources_arg = sources_path is not None
+    if explicit_sources_arg:
+        chosen_path = Path(sources_path)
+    elif source_root is None:
+        # No positional given — try to auto-discover sources.toml.
+        chosen_path = default_sources_path(Path.cwd(), repo)
+    else:
+        chosen_path = None
+
+    if chosen_path is not None:
+        try:
+            sources = load_sources_toml(chosen_path)
+        except ConfigError as e:
+            click.secho(f"error: {e}", fg="red", err=True)
+            sys.exit(2)
+        click.secho(
+            f"Loaded {len(sources)} source(s) from {chosen_path}.",
+            fg="green",
+            err=True,
+        )
+    else:
+        # Fall back to single-root positional behavior.
+        src = Path(source_root) if source_root else repo.parent / "arc"
+        if not src.exists():
+            click.secho(f"error: source root {src} does not exist", fg="red", err=True)
+            sys.exit(2)
+        sources = [SourceConfig(pack="<positional>", root=src)]
 
     postgres = None
     if not no_postgres:
@@ -240,15 +295,54 @@ def ingest(source_root: str | None, no_postgres: bool, no_neo4j: bool) -> None:
             )
 
     pipeline = IngestPipeline(registry, postgres=postgres, neo4j=neo4j_store, embedder=embedder)
-    click.secho(f"Ingesting {src}…", fg="blue", err=True)
-    stats = pipeline.ingest_tree(src)
+
+    # Dispatch loop: visit each [[source]] entry. We walk all sources
+    # against the same Registry — sources.toml does not currently
+    # restrict ingest to "this pack only" because the Registry's
+    # SourceIngester contract is "first non-None claim wins" and any
+    # pack that recognises a file in that tree is welcome to ingest it.
+    # Future: per-source registry views once multi-tenant lands.
+    aggregate_files_seen = 0
+    aggregate_files_ingested = 0
+    aggregate_nodes = 0
+    aggregate_edges = 0
+    aggregate_chunks = 0
+    per_source: list[dict] = []
+    for cfg in sources:
+        click.secho(
+            f"Ingesting [{cfg.pack}] {cfg.root}…",
+            fg="blue",
+            err=True,
+        )
+        stats = pipeline.ingest_tree(
+            cfg.root,
+            include_globs=cfg.glob,
+            exclude_globs=cfg.exclude,
+        )
+        aggregate_files_seen += stats.files_seen
+        aggregate_files_ingested += stats.files_ingested
+        aggregate_nodes += stats.nodes_upserted
+        aggregate_edges += stats.edges_upserted
+        aggregate_chunks += stats.chunks_inserted
+        per_source.append(
+            {
+                "pack": cfg.pack,
+                "root": str(cfg.root),
+                "files_seen": stats.files_seen,
+                "files_ingested": stats.files_ingested,
+                "nodes_upserted": stats.nodes_upserted,
+                "edges_upserted": stats.edges_upserted,
+                "chunks_inserted": stats.chunks_inserted,
+            }
+        )
     click.echo(json.dumps(
         {
-            "files_seen": stats.files_seen,
-            "files_ingested": stats.files_ingested,
-            "nodes_upserted": stats.nodes_upserted,
-            "edges_upserted": stats.edges_upserted,
-            "chunks_inserted": stats.chunks_inserted,
+            "files_seen": aggregate_files_seen,
+            "files_ingested": aggregate_files_ingested,
+            "nodes_upserted": aggregate_nodes,
+            "edges_upserted": aggregate_edges,
+            "chunks_inserted": aggregate_chunks,
+            "sources": per_source,
         },
         indent=2,
     ))

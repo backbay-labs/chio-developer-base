@@ -22,10 +22,11 @@ chunk_text is parsed.text. Phase 1.4+ replaces with a real chunker
 """
 from __future__ import annotations
 
+import fnmatch
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from .plugin import Registry
 from .store import Embedder, Neo4jStore, PostgresStore
@@ -112,10 +113,24 @@ class IngestPipeline:
 
         return n_nodes, n_edges, n_chunks
 
-    def ingest_tree(self, source_root: Path) -> IngestStats:
-        """Walk source_root and ingest every recognized file. Returns aggregate stats."""
+    def ingest_tree(
+        self,
+        source_root: Path,
+        *,
+        include_globs: Sequence[str] = (),
+        exclude_globs: Sequence[str] = (),
+    ) -> IngestStats:
+        """Walk source_root and ingest every recognized file. Returns aggregate stats.
+
+        Optional include/exclude globs (as used by sources.toml) filter
+        the candidate file list relative to `source_root`. Empty
+        `include_globs` means "include everything" (the default).
+        Excludes are applied after includes.
+        """
         stats = IngestStats()
         for path in _walk_source(source_root):
+            if not _path_matches(path, source_root, include_globs, exclude_globs):
+                continue
             stats.files_seen += 1
             n_nodes, n_edges, n_chunks = self.ingest_file(path, source_root)
             if n_nodes or n_edges or n_chunks:
@@ -124,3 +139,27 @@ class IngestPipeline:
                 stats.edges_upserted += n_edges
                 stats.chunks_inserted += n_chunks
         return stats
+
+
+def _path_matches(
+    path: Path,
+    source_root: Path,
+    include_globs: Sequence[str],
+    exclude_globs: Sequence[str],
+) -> bool:
+    """Return True if `path` (under `source_root`) passes the glob filter.
+
+    Empty `include_globs` matches all paths (open by default). Excludes
+    are applied after includes. Patterns are matched relative to
+    `source_root` using fnmatch — same semantics as Python's stdlib
+    glob module, which is the convention sources.toml documents.
+    """
+    try:
+        rel = str(path.relative_to(source_root))
+    except ValueError:
+        return False
+    if include_globs and not any(fnmatch.fnmatch(rel, g) for g in include_globs):
+        return False
+    if any(fnmatch.fnmatch(rel, g) for g in exclude_globs):
+        return False
+    return True
