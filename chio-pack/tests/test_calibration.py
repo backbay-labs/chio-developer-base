@@ -235,3 +235,153 @@ def test_cli_validate_models_flag_reaches_validation_code_path(tmp_path):
     assert proc.returncode in (0, 2), (proc.returncode, proc.stdout, proc.stderr)
     # The flag's identifying output line should always appear.
     assert "rater-B" in proc.stdout and "rater-C" in proc.stdout, proc.stdout
+
+
+# === LLM-LLM independence tripwire ======================================
+
+
+def _run_with_llm_scores(
+    *, b: dict[str, int], c: dict[str, int], a: dict[str, int] | None = None
+) -> CalibrationRun:
+    """Helper: construct a CalibrationRun with synthetic scores from
+    the three raters. Defaults rater-A to 3-across so the LLM-pair
+    rate is independent of A's choices.
+    """
+    if a is None:
+        a = {d: 3 for d in calibration.DIMENSIONS}
+    return CalibrationRun(
+        run_number=0, date="2026-05-08",
+        scenario_id="synthetic", augmentation_name="raw",
+        scores=[
+            RaterScore(rater_id="rater-A", dimensions=dict(a)),
+            RaterScore(rater_id="rater-B", dimensions=dict(b)),
+            RaterScore(rater_id="rater-C", dimensions=dict(c)),
+        ],
+    )
+
+
+def test_llm_pair_rate_zero_when_b_and_c_agree():
+    # Both LLMs give identical scores → 0 flagged / 4 total.
+    run = _run_with_llm_scores(
+        b={"clarity": 4, "accuracy": 4, "actionability": 4, "brevity": 5},
+        c={"clarity": 4, "accuracy": 4, "actionability": 4, "brevity": 5},
+    )
+    flagged, total, rate = run.llm_pair_disagreement_rate()
+    assert (flagged, total) == (0, 4)
+    assert rate == 0.0
+
+
+def test_llm_pair_rate_diff_of_one_does_not_flag():
+    # Per RATERS.md disagreement-flag protocol: |b - c| > 1 flags;
+    # a difference of exactly 1 is NOT a flag.
+    run = _run_with_llm_scores(
+        b={"clarity": 4, "accuracy": 4, "actionability": 4, "brevity": 4},
+        c={"clarity": 5, "accuracy": 3, "actionability": 4, "brevity": 5},
+    )
+    flagged, total, rate = run.llm_pair_disagreement_rate()
+    assert flagged == 0
+    assert total == 4
+    assert rate == 0.0
+
+
+def test_llm_pair_rate_diff_greater_than_one_flags():
+    # Two dimensions differ by 2 (>1) → 2/4 = 50% rate.
+    run = _run_with_llm_scores(
+        b={"clarity": 5, "accuracy": 5, "actionability": 4, "brevity": 4},
+        c={"clarity": 3, "accuracy": 3, "actionability": 4, "brevity": 4},
+    )
+    flagged, total, rate = run.llm_pair_disagreement_rate()
+    assert (flagged, total) == (2, 4)
+    assert rate == pytest.approx(0.5)
+
+
+def test_llm_pair_rate_none_when_an_llm_rater_missing():
+    # No rater-B (e.g., it errored mid-run): rate should be None,
+    # not 0.0 (so the warning doesn't fire spuriously).
+    run = CalibrationRun(
+        run_number=0, date="2026-05-08",
+        scenario_id="synthetic", augmentation_name="raw",
+        scores=[
+            RaterScore(rater_id="rater-A", dimensions={"clarity": 3}),
+            RaterScore(rater_id="rater-C", dimensions={"clarity": 3}),
+        ],
+    )
+    flagged, total, rate = run.llm_pair_disagreement_rate()
+    assert rate is None
+    assert (flagged, total) == (0, 0)
+
+
+def test_independence_warning_fires_below_threshold():
+    # 0% rate < 5% threshold → warning fires.
+    run = _run_with_llm_scores(
+        b={"clarity": 4, "accuracy": 4, "actionability": 4, "brevity": 5},
+        c={"clarity": 4, "accuracy": 4, "actionability": 4, "brevity": 5},
+    )
+    warning = run.llm_independence_warning()
+    assert warning is not None
+    assert "ADR-0004a" in warning
+    assert "Anthropic" in warning
+    assert "0/4" in warning  # flagged/total breakdown
+
+
+def test_independence_warning_silent_above_threshold():
+    # 25% rate > 5% threshold → no warning.
+    run = _run_with_llm_scores(
+        b={"clarity": 5, "accuracy": 4, "actionability": 4, "brevity": 5},
+        c={"clarity": 3, "accuracy": 4, "actionability": 4, "brevity": 5},
+    )
+    assert run.llm_independence_warning() is None
+
+
+def test_independence_warning_silent_when_llm_raters_missing():
+    # If we can't compute a rate, we don't fire (avoids false positives
+    # when both LLM raters errored out on a malformed scenario).
+    run = CalibrationRun(
+        run_number=0, date="2026-05-08",
+        scenario_id="synthetic", augmentation_name="raw",
+        scores=[RaterScore(rater_id="rater-A", dimensions={"clarity": 3})],
+    )
+    assert run.llm_independence_warning() is None
+
+
+def test_independence_warning_threshold_param_overridable():
+    # 25% rate; with a 30% threshold, the warning should fire.
+    run = _run_with_llm_scores(
+        b={"clarity": 5, "accuracy": 4, "actionability": 4, "brevity": 5},
+        c={"clarity": 3, "accuracy": 4, "actionability": 4, "brevity": 5},
+    )
+    assert run.llm_independence_warning(threshold=0.30) is not None
+    assert run.llm_independence_warning(threshold=0.20) is None
+
+
+def test_dry_run_pool_triggers_independence_warning_in_cli():
+    """End-to-end: the deterministic dry-run pool gives B and C
+    matching-enough scores that the 5% tripwire fires. The CLI must
+    surface the warning both in stdout JSON and on stderr.
+
+    If a future change to dry_run_pool drives the LLM pair into a
+    >5% disagreement rate, this test will fail and should be updated
+    along with the change.
+    """
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "chio_pack.eval.calibration",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    # The diagnostic block is always present; the warning text only
+    # when the rate is below threshold.
+    assert "llm_pair_disagreement" in payload
+    block = payload["llm_pair_disagreement"]
+    assert block["total"] == 4
+    if block["rate"] is not None and block["rate"] < block["threshold"]:
+        assert "llm_independence_warning" in payload
+        assert "ADR-0004a" in payload["llm_independence_warning"]
+        assert "ADR-0004a" in proc.stderr

@@ -6,7 +6,7 @@ detection helpers in isolation. The repo-wide regression test at the
 end runs the script's `main()` against the live tree to guarantee the
 script itself stays green on every commit (M0-B.3).
 
-Coverage matrix (engine-side rule):
+Coverage matrix:
 
     detection            kind            test
     -------------------  --------------  ----------------------------
@@ -16,6 +16,7 @@ Coverage matrix (engine-side rule):
                          "dynamic"       ``test_dynamic_importlib``
     __import__("chio_*") "dynamic"       ``test_dynamic_dunder``
     if TYPE_CHECKING:    "type_checking" ``test_type_checking_*``
+    pack-to-pack         "pack_to_pack"  ``test_pack_to_pack_*``
 """
 from __future__ import annotations
 
@@ -49,11 +50,18 @@ def tmp_repo(tmp_path: Path) -> Path:
     """Build a synthetic repo skeleton mirroring the real one."""
     (tmp_path / "kb-engine" / "kb_engine").mkdir(parents=True)
     (tmp_path / "chio-pack" / "chio_pack").mkdir(parents=True)
+    (tmp_path / "alexandria-pack" / "alexandria_pack").mkdir(parents=True)
     return tmp_path
 
 
 def _scan_engine_file(path: Path) -> list:
     return CHECK._scan_file(path, forbid_packs=True)
+
+
+def _scan_pack_file(path: Path, current_pack: str) -> list:
+    return CHECK._scan_file(
+        path, forbid_packs=False, current_pack=current_pack
+    )
 
 
 # ============== Engine-side rule (existing behavior, AST-ified) ==============
@@ -209,17 +217,85 @@ def test_runtime_import_after_type_checking_block_still_errors(
     assert kinds == ["static", "type_checking"]
 
 
-# ============== Repo-wide regression (engine-side only at B.1) ==============
+# ============== Pack-to-pack rule ==============
 
 
-def test_repo_clean_engine_side() -> None:
-    """The live tree must pass `check-imports.py main()` for the
-    engine-side rule. The pytest-collected mirror of the boundary
-    job: any push that introduces a violation will fail the
-    unit-test job before it has a chance to land on main.
+def test_pack_to_pack_static(tmp_repo: Path) -> None:
+    """A second pack importing chio_pack's namespace is forbidden."""
+    f = tmp_repo / "alexandria-pack" / "alexandria_pack" / "x.py"
+    f.write_text("from chio_pack.schema import FILE\n")
+    vs = _scan_pack_file(f, current_pack="alexandria_pack")
+    assert len(vs) == 1
+    assert vs[0].kind == "pack_to_pack"
+
+
+def test_pack_to_pack_dynamic(tmp_repo: Path) -> None:
+    """Dynamic cross-pack import is also forbidden — closing the
+    same regex hole that B.1 fixed for the engine side.
+    """
+    f = tmp_repo / "alexandria-pack" / "alexandria_pack" / "x.py"
+    f.write_text(
+        "import importlib\n"
+        'importlib.import_module("chio_pack.tools")\n'
+    )
+    vs = _scan_pack_file(f, current_pack="alexandria_pack")
+    assert len(vs) == 1
+    assert vs[0].kind == "dynamic"
+
+
+def test_pack_to_pack_aliased(tmp_repo: Path) -> None:
+    f = tmp_repo / "alexandria-pack" / "alexandria_pack" / "x.py"
+    f.write_text("import chio_pack as cp\n")
+    vs = _scan_pack_file(f, current_pack="alexandria_pack")
+    assert len(vs) == 1
+    assert vs[0].kind == "pack_to_pack"
+
+
+def test_pack_self_import_is_clean(tmp_repo: Path) -> None:
+    """`chio_pack` importing its own `chio_pack.schema` is fine —
+    same pack, no boundary crossed.
+    """
+    f = tmp_repo / "chio-pack" / "chio_pack" / "x.py"
+    f.write_text("from chio_pack import schema\n")
+    assert _scan_pack_file(f, current_pack="chio_pack") == []
+
+
+def test_pack_importing_engine_is_clean(tmp_repo: Path) -> None:
+    """A pack importing kb_engine is the *intended* direction —
+    the only direction the engine ↔ pack contract permits.
+    """
+    f = tmp_repo / "chio-pack" / "chio_pack" / "x.py"
+    f.write_text("from kb_engine import Registry\n")
+    assert _scan_pack_file(f, current_pack="chio_pack") == []
+
+
+def test_detect_pack_resolves_owning_pack(tmp_repo: Path) -> None:
+    """A file under `<X>_pack/` is owned by `X_pack`."""
+    deep = tmp_repo / "chio-pack" / "chio_pack" / "eval" / "runners" / "x.py"
+    deep.parent.mkdir(parents=True, exist_ok=True)
+    deep.write_text("")
+    assert CHECK._detect_pack(deep, tmp_repo) == "chio_pack"
+
+
+def test_detect_pack_returns_none_outside_packs(tmp_repo: Path) -> None:
+    f = tmp_repo / "kb-engine" / "kb_engine" / "x.py"
+    f.write_text("")
+    assert CHECK._detect_pack(f, tmp_repo) is None
+
+
+# ============== Repo-wide regression ==============
+
+
+def test_repo_clean() -> None:
+    """The live tree must pass `check-imports.py main()` for both
+    the engine-side and pack-to-pack rules. The pytest-collected
+    mirror of the boundary job: any push that introduces a violation
+    will fail the unit-test job before it has a chance to land on
+    main.
     """
     rc = CHECK.main()
     assert rc == 0, (
         "boundary check failed on the live tree — see the printed"
-        " violations above."
+        " violations above. Run `make check-boundary` locally to"
+        " reproduce."
     )

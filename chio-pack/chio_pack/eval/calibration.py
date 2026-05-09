@@ -290,6 +290,25 @@ def dry_run_pool() -> list[Rater]:
     ]
 
 
+# LLM-LLM independence tripwire threshold. ADR-0004 admits rater-B and
+# rater-C are within the same Anthropic family; a low disagreement-flag
+# rate between them is *expected* but it also makes inter-rater agreement
+# statistics optimistic. The tripwire fires at 5%: below that, treat
+# disagreement statistics as suspect and reference ADR-0004a sunset
+# criterion.
+LLM_DISAGREEMENT_TRIPWIRE_RATE = 0.05
+LLM_RATER_IDS = ("rater-B", "rater-C")
+LLM_INDEPENDENCE_WARNING = (
+    "rater-B / rater-C disagreement-flag rate {rate:.1%} is below the "
+    "{threshold:.0%} tripwire ({flagged}/{total} dimensions flagged). "
+    "Both raters are Anthropic-family LLMs (ADR-0004); inter-rater "
+    "agreement statistics from this run may be optimistically biased. "
+    "Treat the disagreement-flag rate as a lower bound; track the "
+    "ADR-0004a sunset criterion (12 weeks from 2026-05-07; recruit "
+    "non-Anthropic raters or re-affirm LLM-judge choice with cost data)."
+)
+
+
 @dataclass
 class CalibrationRun:
     run_number: int
@@ -312,6 +331,63 @@ class CalibrationRun:
             if mx - mn > 1:
                 flags[d] = (mx, mn)
         return flags
+
+    def llm_pair_disagreement_rate(self) -> tuple[int, int, float | None]:
+        """Disagreement rate between the two LLM raters (B and C).
+
+        Returns `(flagged, total, rate)` where:
+          - `flagged` is the count of dimensions where
+            |rater-B − rater-C| > 1.
+          - `total` is the count of dimensions for which both raters
+            produced a numeric score.
+          - `rate` is `flagged / total`, or `None` if `total == 0`
+            (e.g. both LLM raters errored out on this scenario).
+
+        ADR-0004 rationale: rater-B (Sonnet) and rater-C (Haiku) are
+        within the same Anthropic family. Low disagreement is expected;
+        we surface the rate so a downstream check can fire when it's
+        suspiciously low (see `LLM_DISAGREEMENT_TRIPWIRE_RATE`).
+        """
+        by_id = {s.rater_id: s for s in self.scores}
+        b = by_id.get(LLM_RATER_IDS[0])
+        c = by_id.get(LLM_RATER_IDS[1])
+        if b is None or c is None:
+            return (0, 0, None)
+        flagged = 0
+        total = 0
+        for d in DIMENSIONS:
+            bv = b.dimensions.get(d)
+            cv = c.dimensions.get(d)
+            if bv is None or cv is None:
+                continue
+            total += 1
+            if abs(bv - cv) > 1:
+                flagged += 1
+        if total == 0:
+            return (0, 0, None)
+        return (flagged, total, flagged / total)
+
+    def llm_independence_warning(
+        self,
+        *,
+        threshold: float = LLM_DISAGREEMENT_TRIPWIRE_RATE,
+    ) -> str | None:
+        """Return a warning string if the LLM-LLM disagreement-flag
+        rate is below `threshold`. None otherwise (or if both LLM
+        raters failed to score this run).
+
+        Threshold is exposed for testability; the production tripwire
+        uses `LLM_DISAGREEMENT_TRIPWIRE_RATE` (5%).
+        """
+        flagged, total, rate = self.llm_pair_disagreement_rate()
+        if rate is None:
+            return None
+        if rate >= threshold:
+            return None
+        return LLM_INDEPENDENCE_WARNING.format(
+            rate=rate, threshold=threshold,
+            flagged=flagged, total=total,
+        )
 
 
 def calibrate(
@@ -488,6 +564,19 @@ def main() -> int:
         ],
         "disagreement_flags": run.disagreement_flags(),
     }
+    flagged, total, rate = run.llm_pair_disagreement_rate()
+    out["llm_pair_disagreement"] = {
+        "flagged": flagged,
+        "total": total,
+        "rate": rate,
+        "threshold": LLM_DISAGREEMENT_TRIPWIRE_RATE,
+    }
+    indep_warning = run.llm_independence_warning()
+    if indep_warning is not None:
+        out["llm_independence_warning"] = indep_warning
+        # Also surface to stderr so a CI log captures it independent of
+        # how the JSON gets consumed.
+        print(f"warning: {indep_warning}", file=sys.stderr)
     print(json.dumps(out, indent=2))
 
     if args.report:

@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
-"""Engine ↔ pack boundary import-rule check.
+"""Engine ↔ pack and pack ↔ pack boundary import-rule check.
 
-Per PLAN.md and AGENTS.md hard rule #3: `kb-engine/` MUST NOT import
-anything `chio_*` (or any `*_pack` namespace, the convention used to
-mark a pack — see `chio_pack` and the M4 `alexandria_pack` plan).
+Per PLAN.md and AGENTS.md hard rule #3:
+
+  - `kb-engine/` MUST NOT import anything `chio_*` (or any `*_pack`).
+  - One pack MUST NOT import another pack's namespace.
+    Convention: a "pack" is a top-level Python package whose name
+    ends in `_pack` (matching the existing `chio_pack` carve-out).
+    A file is owned by `<X>_pack` if its repo-relative path traverses
+    a directory named `<X>_pack`. The engine is meant to host more
+    packs (e.g. `alexandria_pack`, M4 milestone) and the symmetric
+    rule must hold *before* there is a second pack to test it
+    against — bidirectional containment is what makes the boundary
+    load-bearing rather than directional.
 
 Detection strategy: Python AST walk (not text/regex).
 
@@ -65,7 +74,7 @@ class Violation:
     path: Path
     line: int
     detail: str
-    kind: str  # "static", "dynamic", "type_checking"
+    kind: str  # "static", "dynamic", "type_checking", "pack_to_pack"
 
 
 def _is_chio_or_pack(name: str) -> bool:
@@ -74,6 +83,30 @@ def _is_chio_or_pack(name: str) -> bool:
         return False
     head = name.split(".", 1)[0]
     return head.startswith("chio_") or head.endswith(PACK_SUFFIX)
+
+
+def _is_other_pack(name: str, current_pack: str | None) -> bool:
+    """True if `name` is a pack other than `current_pack`."""
+    if not name or current_pack is None:
+        return False
+    head = name.split(".", 1)[0]
+    return head.endswith(PACK_SUFFIX) and head != current_pack
+
+
+def _detect_pack(file_path: Path, repo_root: Path) -> str | None:
+    """Return the pack name (`*_pack`) that owns this file, or None.
+
+    A file is owned by pack `X_pack` if the path traversal from
+    `repo_root` to `file_path` includes a directory named `X_pack`.
+    """
+    try:
+        rel = file_path.resolve().relative_to(repo_root.resolve())
+    except ValueError:
+        return None
+    for part in rel.parts:
+        if part.endswith(PACK_SUFFIX):
+            return part
+    return None
 
 
 def _type_checking_line_ranges(tree: ast.AST) -> list[tuple[int, int]]:
@@ -128,13 +161,25 @@ def _const_str_arg(call: ast.Call) -> str | None:
     return None
 
 
-def _scan_file(py: Path, *, forbid_packs: bool) -> list[Violation]:
-    """Scan one file, returning all engine-side boundary violations.
+def _scan_file(
+    py: Path,
+    *,
+    forbid_packs: bool,
+    current_pack: str | None = None,
+) -> list[Violation]:
+    """Scan one file, returning all boundary violations in it.
 
-    `forbid_packs=True` triggers the engine-side rule: any
-    chio_*/`*_pack` import (static, aliased, or dynamic) is forbidden.
-    A future iteration (M0-B.2) extends `_scan_file` with the symmetric
-    pack-to-pack rule.
+    `forbid_packs=True` is the engine-side rule: any chio_*/`*_pack`
+    import (static, aliased, or dynamic) is forbidden.
+
+    `current_pack` triggers the pack-to-pack rule: any import of a
+    *different* `*_pack` from inside this file is forbidden. Set
+    `forbid_packs=False, current_pack="chio_pack"` to scan files
+    owned by `chio_pack` for cross-pack imports.
+
+    Both rules can be combined (`forbid_packs=True, current_pack=...`)
+    but in practice the engine isn't owned by any pack, so callers
+    pick one.
     """
     try:
         text = py.read_text(encoding="utf-8")
@@ -150,13 +195,18 @@ def _scan_file(py: Path, *, forbid_packs: bool) -> list[Violation]:
     tc_ranges = _type_checking_line_ranges(tree)
     out: list[Violation] = []
 
-    def _violates(name: str) -> bool:
-        return forbid_packs and _is_chio_or_pack(name)
+    def _classify(name: str) -> str | None:
+        if forbid_packs and _is_chio_or_pack(name):
+            return "static"
+        if current_pack and _is_other_pack(name, current_pack):
+            return "pack_to_pack"
+        return None
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                if not _violates(alias.name):
+                kind = _classify(alias.name)
+                if not kind:
                     continue
                 if _line_in_ranges(node.lineno, tc_ranges):
                     out.append(Violation(
@@ -168,11 +218,12 @@ def _scan_file(py: Path, *, forbid_packs: bool) -> list[Violation]:
                     out.append(Violation(
                         path=py, line=node.lineno,
                         detail=f"import {alias.name}",
-                        kind="static",
+                        kind=kind,
                     ))
         elif isinstance(node, ast.ImportFrom):
             mod = node.module or ""
-            if not _violates(mod):
+            kind = _classify(mod)
+            if not kind:
                 continue
             names = ", ".join(a.name for a in node.names)
             if _line_in_ranges(node.lineno, tc_ranges):
@@ -185,13 +236,14 @@ def _scan_file(py: Path, *, forbid_packs: bool) -> list[Violation]:
                 out.append(Violation(
                     path=py, line=node.lineno,
                     detail=f"from {mod} import {names}",
-                    kind="static",
+                    kind=kind,
                 ))
         elif isinstance(node, ast.Call) and _is_dynamic_import_call(node):
             target = _const_str_arg(node)
             if target is None:
                 continue
-            if not _violates(target):
+            kind = _classify(target)
+            if not kind:
                 continue
             out.append(Violation(
                 path=py, line=node.lineno,
@@ -201,16 +253,43 @@ def _scan_file(py: Path, *, forbid_packs: bool) -> list[Violation]:
     return out
 
 
+_SKIP_DIRS = {".venv", "__pycache__", "node_modules", ".git"}
+
+
+def _walk_py(root: Path) -> list[Path]:
+    return [
+        p for p in sorted(root.rglob("*.py"))
+        if not any(part in _SKIP_DIRS for part in p.parts)
+    ]
+
+
 def find_engine_violations(engine_root: Path) -> list[Violation]:
     """Engine-side rule: kb-engine imports nothing chio_*/`*_pack`."""
     if not engine_root.is_dir():
         print(f"error: {engine_root} not a directory", file=sys.stderr)
         sys.exit(2)
     violations: list[Violation] = []
-    for py in sorted(engine_root.rglob("*.py")):
-        if any(p in {".venv", "__pycache__"} for p in py.parts):
-            continue
+    for py in _walk_py(engine_root):
         violations.extend(_scan_file(py, forbid_packs=True))
+    return violations
+
+
+def find_pack_violations(repo_root: Path) -> list[Violation]:
+    """Pack-to-pack rule: a `*_pack` package imports no other `*_pack`.
+
+    Walks the whole repo; any file whose path traverses a `*_pack`
+    directory inherits that pack's identity and is then scanned for
+    imports of *different* `*_pack` namespaces. Files outside any
+    pack directory are skipped (not under this rule's jurisdiction).
+    """
+    violations: list[Violation] = []
+    for py in _walk_py(repo_root):
+        current = _detect_pack(py, repo_root)
+        if current is None:
+            continue
+        violations.extend(
+            _scan_file(py, forbid_packs=False, current_pack=current)
+        )
     return violations
 
 
@@ -223,7 +302,7 @@ def main() -> int:
     repo_root = Path(__file__).resolve().parents[2]
     engine_root = repo_root / "kb-engine" / "kb_engine"
 
-    all_v = find_engine_violations(engine_root)
+    all_v = find_engine_violations(engine_root) + find_pack_violations(repo_root)
     errors = [v for v in all_v if v.kind != "type_checking"]
     warnings = [v for v in all_v if v.kind == "type_checking"]
 
@@ -239,24 +318,29 @@ def main() -> int:
         print()
 
     if errors:
-        print(f"engine ↔ pack boundary violations ({len(errors)}):")
+        print(
+            f"engine ↔ pack / pack ↔ pack boundary violations ({len(errors)}):"
+        )
         for v in errors:
             print(_fmt(v, repo_root))
         print()
         print(
             "kb-engine/ must not import chio_*/*_pack at runtime. Move"
-            " the pack-specific code into chio-pack/ and register a"
-            " plugin via kb_engine.Registry."
+            " the pack-specific code into the appropriate */*_pack/ and"
+            " register a plugin via kb_engine.Registry. Packs must not"
+            " import each other's namespaces — extract shared logic into"
+            " kb_engine, or coordinate via a Registry hook."
         )
         return 1
 
-    n_engine = sum(
-        1 for p in engine_root.rglob("*.py")
-        if not any(x in {".venv", "__pycache__"} for x in p.parts)
+    n_engine = len(_walk_py(engine_root))
+    n_pack_files = sum(
+        1 for p in _walk_py(repo_root)
+        if _detect_pack(p, repo_root) is not None
     )
     print(
         f"ok — boundary check clean: {n_engine} engine files,"
-        f" {len(warnings)} TYPE_CHECKING warnings."
+        f" {n_pack_files} pack files, {len(warnings)} TYPE_CHECKING warnings."
     )
     return 0
 
