@@ -332,6 +332,180 @@ def test_graphiti_router_falls_back_to_frontmatter_for_episode_body():
     assert "episode-architecture-summary" in body
 
 
+# === Deletion handling (M0-C.1) ===
+
+
+def test_null_router_records_deletions():
+    r = NullRouter()
+    r.on_record_deleted("spec.x", pathlib.Path("/v/spec/x.md"))
+    assert r.deleted == [("spec.x", pathlib.Path("/v/spec/x.md"))]
+
+
+def test_jsonl_router_writes_deletion_line(tmp_path):
+    p = tmp_path / "audit.jsonl"
+    r = JsonlRouter(p)
+    r.write([DerivedRecord(target="neo4j", payload={"id": "spec.x"})])
+    r.on_record_deleted("spec.x", pathlib.Path("/v/spec/x.md"))
+    lines = p.read_text().strip().splitlines()
+    assert len(lines) == 2
+    import json as _json
+    deleted = _json.loads(lines[1])
+    assert deleted["target"] == "_deleted"
+    assert deleted["payload"]["id"] == "spec.x"
+    assert "/v/spec/x.md" in deleted["payload"]["source_path"]
+
+
+def test_graphiti_router_records_deletion_intent_without_posting():
+    sent: list = []
+
+    def fake_post(url, json):
+        sent.append(json)
+        return _FakeResponse(200)
+
+    router = GraphitiHttpRouter("http://localhost:8000/mcp", post=fake_post)
+    router.on_record_deleted("ep.x", pathlib.Path("/v/episodes/x.md"))
+    # Per AGENTS.md hard rule #1 + episodes/_README.md ("Graphiti is
+    # append-mostly"): the daemon does not POST a delete to Graphiti.
+    # The deletion intent is recorded for the tombstone audit only.
+    assert sent == []
+    assert router.deletions == [("ep.x", pathlib.Path("/v/episodes/x.md"))]
+
+
+def test_daemon_emits_deletion_record_on_delete_file(tmp_path):
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    note = vault / "x.md"
+    note.write_text("---\ntype: spec\nid: spec.x\n---\nBody\n")
+
+    registry = _build_registry_with_handler()
+    router = NullRouter()
+    daemon = VaultSyncDaemon(registry, [router], state_path=tmp_path / "state.json")
+
+    daemon.run_once(vault)
+    assert str(note) in daemon.state.hashes
+    # Frontmatter id was recorded so deletion can route by id later
+    assert daemon.state.meta[str(note)]["id"] == "spec.x"
+
+    note.unlink()
+    emitted, node_id = daemon.delete_file(note)
+    assert emitted is True
+    assert node_id == "spec.x"
+    assert router.deleted == [("spec.x", note)]
+    # State is pruned
+    assert str(note) not in daemon.state.hashes
+    assert str(note) not in daemon.state.meta
+
+
+def test_daemon_delete_file_untracked_is_noop(tmp_path):
+    """A delete event for a file we never tracked (no frontmatter when
+    it was alive) is safe — no router call, state stays clean.
+    """
+    registry = _build_registry_with_handler()
+    router = NullRouter()
+    daemon = VaultSyncDaemon(registry, [router], state_path=tmp_path / "state.json")
+
+    emitted, node_id = daemon.delete_file(tmp_path / "never-existed.md")
+    assert emitted is False
+    assert node_id is None
+    assert router.deleted == []
+
+
+def test_daemon_delete_file_writes_to_all_routers(tmp_path):
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    note = vault / "x.md"
+    note.write_text("---\ntype: spec\nid: spec.x\n---\n")
+
+    registry = _build_registry_with_handler()
+    audit = NullRouter()
+    main = NullRouter()
+    daemon = VaultSyncDaemon(registry, [audit, main], state_path=tmp_path / "state.json")
+    daemon.run_once(vault)
+
+    note.unlink()
+    daemon.delete_file(note)
+    assert audit.deleted == [("spec.x", note)]
+    assert main.deleted == [("spec.x", note)]
+
+
+def test_watchdog_on_deleted_triggers_delete_file(tmp_path):
+    """Verifies the watchdog handler shape calls delete_file for .md
+    files. Uses a stub Observer/Handler so no real watchdog is needed.
+    """
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    note = vault / "x.md"
+    note.write_text("---\ntype: spec\nid: spec.x\n---\n")
+
+    registry = _build_registry_with_handler()
+    router = NullRouter()
+    daemon = VaultSyncDaemon(registry, [router], state_path=tmp_path / "state.json")
+    daemon.run_once(vault)
+
+    # Capture the inner _Handler class without starting a real loop
+    class _StubObserver:
+        def __init__(self):
+            self.handler = None
+
+        def schedule(self, handler, root, recursive):
+            self.handler = handler
+
+        def start(self):
+            raise _StubStop()
+
+        def stop(self):
+            pass
+
+        def join(self):
+            pass
+
+    class _StubStop(Exception):
+        pass
+
+    class _StubHandler:
+        is_directory = False
+
+    captured_observer = _StubObserver()
+    try:
+        daemon._run_with_watchdog(vault, lambda: captured_observer, _StubHandler)
+    except _StubStop:
+        pass
+
+    handler = captured_observer.handler
+    note.unlink()
+
+    class _Event:
+        def __init__(self, path):
+            self.is_directory = False
+            self.src_path = str(path)
+
+    handler.on_deleted(_Event(note))
+    assert router.deleted == [("spec.x", note)]
+
+
+def test_daemon_delete_file_skips_when_no_frontmatter_id(tmp_path):
+    """Files that were processed but had no `id` (e.g., status-only or
+    legacy notes) should not emit a delete record — there's no node_id
+    to mutate. State is still pruned so re-creation re-processes.
+    """
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    note = vault / "x.md"
+    note.write_text("---\ntype: spec\n---\nBody without id\n")
+
+    registry = _build_registry_with_handler()
+    router = NullRouter()
+    daemon = VaultSyncDaemon(registry, [router], state_path=tmp_path / "state.json")
+    daemon.run_once(vault)
+
+    note.unlink()
+    emitted, node_id = daemon.delete_file(note)
+    assert emitted is False
+    assert node_id is None
+    assert router.deleted == []
+    assert str(note) not in daemon.state.hashes
+
+
 def test_graphiti_router_increments_jsonrpc_id_per_call():
     sent: list = []
 

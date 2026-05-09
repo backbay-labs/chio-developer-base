@@ -16,6 +16,18 @@ Idempotency: each processed file's content hash is tracked in an
 on-disk state file (`.chio-dev/vault-sync.state.json` by default).
 Files whose hash matches the last seen state are skipped.
 
+Lifecycle: vault is canonical and derived stores must follow it. The
+daemon therefore handles the full lifecycle of a vault note:
+
+  - create / modify  → process_file() emits DerivedRecords via Router.write
+  - rename           → move_file() preserves graph identity if the
+                       frontmatter `id` is unchanged, or emits a
+                       delete+create pair if `id` changed
+  - delete           → delete_file() emits a deletion via Router
+                       on_record_deleted (tombstone audit in M0-C.4)
+  - offline deletion → SyncState.prune() detects entries whose source
+                       file no longer exists and re-emits the deletion
+
 Routers
 -------
 A `Router` consumes DerivedRecord objects and writes them to the
@@ -51,16 +63,42 @@ FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 class Router(Protocol):
     """Routes derived records to backing stores. Plugins / wiring code
     decide which router(s) to use.
+
+    Lifecycle methods:
+      - write(records)                      derivations from create / modify
+      - on_record_deleted(node_id, path)    deletion of a vault note (the
+                                            daemon is the sole writer to
+                                            derived stores per AGENTS.md
+                                            hard rule #1, so the deletion
+                                            path lives here too)
+
+    `node_id` is the frontmatter `id` of the deleted note (the contract
+    documented in AGENTS.md "Vault frontmatter is a contract"). The
+    Router decides how to map that into its store's identifier; e.g.,
+    Neo4jStoreRouter calls `Neo4jStore.delete_node(node_id)`.
+
+    `source_path` is the absolute path to the vault file that was
+    removed. It is informational — the Router should key off `node_id`
+    when mutating a derived store, since the file is gone by the time
+    this is called.
     """
 
     def write(self, records: Iterable[DerivedRecord]) -> int: ...
 
+    def on_record_deleted(self, node_id: str, source_path: Path) -> None: ...
+
 
 class NullRouter:
-    """Drops everything. For tests + dry-run."""
+    """Drops everything. For tests + dry-run.
+
+    Records writes in `received` and deletions in `deleted` so tests can
+    assert lifecycle events reach the router without standing up real
+    backing stores.
+    """
 
     def __init__(self) -> None:
         self.received: list[DerivedRecord] = []
+        self.deleted: list[tuple[str, Path]] = []
 
     def write(self, records: Iterable[DerivedRecord]) -> int:
         n = 0
@@ -69,10 +107,16 @@ class NullRouter:
             n += 1
         return n
 
+    def on_record_deleted(self, node_id: str, source_path: Path) -> None:
+        self.deleted.append((node_id, source_path))
+
 
 class JsonlRouter:
     """Append-only audit log. Production runs typically chain this with
     a real router so every derivation is replayable.
+
+    Deletion lines use the special target `"_deleted"` to keep the same
+    schema as derivation lines while staying greppable.
     """
 
     def __init__(self, path: Path) -> None:
@@ -86,6 +130,13 @@ class JsonlRouter:
                 f.write(json.dumps({"target": r.target, "payload": r.payload}) + "\n")
                 n += 1
         return n
+
+    def on_record_deleted(self, node_id: str, source_path: Path) -> None:
+        with self.path.open("a") as f:
+            f.write(json.dumps({
+                "target": "_deleted",
+                "payload": {"id": node_id, "source_path": str(source_path)},
+            }) + "\n")
 
 
 class GraphitiHttpRouter:
@@ -122,6 +173,15 @@ class GraphitiHttpRouter:
         self._post = post
         self._next_id = 1
         self.failures: list[tuple[DerivedRecord, str]] = []
+        # Graphiti is append-mostly per vault/episodes/_README.md ("How
+        # to remove an episode: You don't, generally"). The daemon
+        # records the deletion intent here so the tombstone audit (M0-C.4)
+        # has a witness, but we do NOT POST a delete tool call to the
+        # Graphiti MCP — the canonical deletion record lives in the
+        # vault tombstone JSONL and the receiving graph is treated as
+        # an append-mostly index whose stale entries are reconciled out
+        # of band.
+        self.deletions: list[tuple[str, Path]] = []
 
     def _default_post(self, url: str, json: dict[str, Any]) -> Any:
         try:
@@ -177,6 +237,9 @@ class GraphitiHttpRouter:
             n += 1
         return n
 
+    def on_record_deleted(self, node_id: str, source_path: Path) -> None:
+        self.deletions.append((node_id, source_path))
+
 
 # === Frontmatter parsing ===
 
@@ -217,10 +280,23 @@ def _content_hash(text: str) -> str:
 
 @dataclass
 class SyncState:
-    """On-disk state: file path → last-seen content hash."""
+    """On-disk state: per-file last-seen content hash + optional metadata.
+
+    `hashes` keys file path strings to their last-seen sha256 (the
+    legacy field; preserved for back-compat with existing state files
+    and tests).
+
+    `meta` keys the same path strings to a dict capturing what the
+    daemon needs to remember for deletion / rename routing — minimally
+    the frontmatter `id` and `type`. Entries can be missing meta (e.g.,
+    pre-meta state files, or files with no frontmatter); deletion paths
+    handle the absence by skipping the Router call (the audit log still
+    fires).
+    """
 
     path: Path
     hashes: dict[str, str] = field(default_factory=dict)
+    meta: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: Path) -> "SyncState":
@@ -228,7 +304,11 @@ class SyncState:
             try:
                 with path.open() as f:
                     data = json.load(f)
-                return cls(path=path, hashes=dict(data.get("hashes", {})))
+                return cls(
+                    path=path,
+                    hashes=dict(data.get("hashes", {})),
+                    meta={k: dict(v) for k, v in dict(data.get("meta", {})).items()},
+                )
             except (OSError, json.JSONDecodeError):
                 pass
         return cls(path=path)
@@ -236,7 +316,20 @@ class SyncState:
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("w") as f:
-            json.dump({"hashes": self.hashes}, f, indent=2, sort_keys=True)
+            json.dump(
+                {"hashes": self.hashes, "meta": self.meta},
+                f,
+                indent=2,
+                sort_keys=True,
+            )
+
+    def forget(self, path_str: str) -> dict[str, Any]:
+        """Drop both hash and meta for `path_str`. Returns the dropped
+        meta dict (empty if there was none). Used by deletion / rename
+        flows to keep state in sync with the vault.
+        """
+        self.hashes.pop(path_str, None)
+        return self.meta.pop(path_str, {})
 
 
 @dataclass
@@ -246,6 +339,7 @@ class SyncStats:
     files_skipped_unchanged: int = 0
     files_skipped_no_frontmatter: int = 0
     records_routed: int = 0
+    files_deleted: int = 0
 
 
 # === Daemon ===
@@ -293,14 +387,25 @@ class VaultSyncDaemon:
         frontmatter, _body = _parse_frontmatter(text)
         if frontmatter is None:
             self.state.hashes[rel] = h
+            self.state.meta.pop(rel, None)
             return 0, "no_frontmatter"
 
         type_ = frontmatter.get("type")
         if not type_:
             self.state.hashes[rel] = h
+            self.state.meta.pop(rel, None)
             return 0, "no_type"
 
         records = self.registry.handle_frontmatter(type_, frontmatter)
+        # Always remember the frontmatter id/type, even if the registry
+        # didn't emit records for this type — so a later deletion or
+        # rename can still emit a deletion record keyed on `id`.
+        node_id = frontmatter.get("id")
+        if node_id is not None:
+            self.state.meta[rel] = {"id": str(node_id), "type": str(type_)}
+        else:
+            self.state.meta.pop(rel, None)
+
         if not records:
             self.state.hashes[rel] = h
             return 0, "processed"
@@ -310,6 +415,31 @@ class VaultSyncDaemon:
             n_routed += router.write(records)
         self.state.hashes[rel] = h
         return n_routed, "processed"
+
+    def delete_file(self, path: Path) -> tuple[bool, str | None]:
+        """Handle deletion of a vault file. Returns (emitted, node_id).
+
+        Looks up the file's last-known frontmatter `id` from SyncState;
+        if found, calls `Router.on_record_deleted(node_id, path)` on
+        every configured router. State is pruned regardless so
+        re-creation of the file later re-processes it from scratch.
+
+        Returns:
+          - emitted: True if a deletion record was actually emitted
+                     (i.e., we knew the file's `id`). False means the
+                     file was untracked (e.g., never had frontmatter
+                     when it was alive) — still safe to drop the state
+                     entry.
+          - node_id: The id we emitted, or None if untracked.
+        """
+        rel = str(path)
+        meta = self.state.forget(rel)
+        node_id = meta.get("id")
+        if not node_id:
+            return False, None
+        for router in self.routers:
+            router.on_record_deleted(node_id, path)
+        return True, node_id
 
     def run_once(self, vault_root: Path, *, glob: str = "**/*.md") -> SyncStats:
         """One-shot scan of vault_root. Returns aggregate stats and persists state."""
@@ -360,6 +490,11 @@ class VaultSyncDaemon:
 
             def on_created(self, event):
                 self.on_modified(event)
+
+            def on_deleted(self, event):
+                if not event.is_directory and str(event.src_path).endswith(".md"):
+                    daemon.delete_file(Path(event.src_path))
+                    daemon.state.save()
 
         observer = Observer()
         observer.schedule(_Handler(), str(vault_root), recursive=True)

@@ -46,6 +46,28 @@ except ImportError:
 DIMENSIONS = ("clarity", "accuracy", "actionability", "brevity")
 
 
+# Default Anthropic model names for raters B and C. These can be
+# overridden at runtime via the env vars `CHIO_KB_RATER_B_MODEL` and
+# `CHIO_KB_RATER_C_MODEL` so that operators can pin a specific snapshot
+# without editing source. See ADR-0004 for the rationale on rater pool
+# composition; per ADR-0004a the sunset criterion for "B and C are the
+# same Anthropic family" lives in the calibration harness.
+_DEFAULT_RATER_B_MODEL = "claude-sonnet-4-6"
+_DEFAULT_RATER_C_MODEL = "claude-haiku-4-5-20251001"
+_RATER_B_MODEL_ENV = "CHIO_KB_RATER_B_MODEL"
+_RATER_C_MODEL_ENV = "CHIO_KB_RATER_C_MODEL"
+
+
+def rater_b_model() -> str:
+    """Resolved Anthropic model name for rater-B (canonical rubric)."""
+    return os.environ.get(_RATER_B_MODEL_ENV, _DEFAULT_RATER_B_MODEL)
+
+
+def rater_c_model() -> str:
+    """Resolved Anthropic model name for rater-C (accuracy-emphasis rubric)."""
+    return os.environ.get(_RATER_C_MODEL_ENV, _DEFAULT_RATER_C_MODEL)
+
+
 # === Rubric source ===
 
 
@@ -234,18 +256,20 @@ def _parse_score(rater_id: str, text: str) -> RaterScore:
 
 def default_pool() -> list[Rater]:
     """Three raters per ADR-0004 (Phase 0 pool). Construct fresh each
-    time to keep state isolated across runs.
+    time to keep state isolated across runs. Rater-B and rater-C model
+    names resolve from env vars (`CHIO_KB_RATER_B_MODEL`,
+    `CHIO_KB_RATER_C_MODEL`); see `rater_b_model` / `rater_c_model`.
     """
     return [
         HumanRater(rater_id="rater-A", rubric_system=CANONICAL_RUBRIC_SYSTEM),
         AnthropicRater(
             rater_id="rater-B",
-            model="claude-sonnet-4-6",
+            model=rater_b_model(),
             rubric_system=CANONICAL_RUBRIC_SYSTEM,
         ),
         AnthropicRater(
             rater_id="rater-C",
-            model="claude-haiku-4-5-20251001",
+            model=rater_c_model(),
             rubric_system=ACCURACY_EMPHASIS_SYSTEM,
         ),
     ]
@@ -337,6 +361,68 @@ def render_calibration_md(run: CalibrationRun) -> str:
     return "\n".join(lines)
 
 
+@dataclass
+class ModelValidationResult:
+    rater_id: str
+    model: str
+    ok: bool
+    error: str | None = None
+
+
+def validate_models(
+    *,
+    client_factory: Callable[[], Any] | None = None,
+) -> list[ModelValidationResult]:
+    """Smoke-check that rater-B and rater-C model names are live by
+    issuing a 1-token dummy call to each.
+
+    `client_factory` is injectable so tests can substitute a fake
+    Anthropic client without monkey-patching the SDK; production
+    callers leave it None and the real `anthropic.Anthropic()`
+    client is constructed lazily.
+
+    Returns one result per rater. The harness never raises; errors
+    are captured per-rater so the operator can see both at once.
+    """
+    if client_factory is None:
+        try:
+            import anthropic  # type: ignore
+        except ImportError:
+            err = (
+                "anthropic SDK not installed. "
+                "`uv pip install anthropic` (or `--dry-run` for tests) "
+                "to validate model names."
+            )
+            return [
+                ModelValidationResult("rater-B", rater_b_model(), False, err),
+                ModelValidationResult("rater-C", rater_c_model(), False, err),
+            ]
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            err = "ANTHROPIC_API_KEY not set; cannot validate model names."
+            return [
+                ModelValidationResult("rater-B", rater_b_model(), False, err),
+                ModelValidationResult("rater-C", rater_c_model(), False, err),
+            ]
+        client_factory = lambda: anthropic.Anthropic()  # noqa: E731
+
+    client = client_factory()
+    results: list[ModelValidationResult] = []
+    for rater_id, model in (
+        ("rater-B", rater_b_model()),
+        ("rater-C", rater_c_model()),
+    ):
+        try:
+            client.messages.create(
+                model=model,
+                max_tokens=1,
+                messages=[{"role": "user", "content": "ping"}],
+            )
+            results.append(ModelValidationResult(rater_id, model, True))
+        except Exception as e:  # noqa: BLE001 — we want to surface every error
+            results.append(ModelValidationResult(rater_id, model, False, str(e)))
+    return results
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     default_scenario = (
@@ -351,7 +437,33 @@ def main() -> int:
                    help="Use deterministic raters; no API calls / no human input.")
     p.add_argument("--report", default=None,
                    help="Append rendered rows to this rater-calibration.md.")
+    p.add_argument(
+        "--validate-models",
+        action="store_true",
+        help=(
+            "Issue a 1-token dummy call to the rater-B and rater-C "
+            "models (resolved via CHIO_KB_RATER_B_MODEL and "
+            "CHIO_KB_RATER_C_MODEL) and exit. Useful for catching "
+            "bad model names before a real calibration run."
+        ),
+    )
     args = p.parse_args()
+
+    if args.validate_models:
+        results = validate_models()
+        for r in results:
+            tag = "ok" if r.ok else "FAIL"
+            print(f"[{tag}] {r.rater_id} model={r.model}"
+                  + (f" — {r.error}" if r.error else ""))
+        if any(not r.ok for r in results):
+            print(
+                "error: one or more rater models did not validate. "
+                "Set CHIO_KB_RATER_B_MODEL / CHIO_KB_RATER_C_MODEL or "
+                "fix ANTHROPIC_API_KEY before running calibration.",
+                file=sys.stderr,
+            )
+            return 2
+        return 0
 
     pool = dry_run_pool() if args.dry_run else default_pool()
     run = calibrate(
