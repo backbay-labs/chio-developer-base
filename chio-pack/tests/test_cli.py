@@ -51,3 +51,41 @@ def test_session_tool_call_writes_event(tmp_path, monkeypatch):
     content = sessions[0].read_text()
     assert "kb_search_code" in content
     assert '"q": "x"' in content
+
+
+# === M1-Multitenant deliverable 3: --pack-schema / CHIO_KB_PACK_SCHEMA ===
+
+
+def test_resolve_pack_schema_priority_order(monkeypatch):
+    """`--pack-schema` flag wins, then env, then default."""
+    from chio_pack.cli import _resolve_pack_schema
+
+    monkeypatch.delenv("CHIO_KB_PACK_SCHEMA", raising=False)
+    assert _resolve_pack_schema(None) == "chio_kb"
+
+    monkeypatch.setenv("CHIO_KB_PACK_SCHEMA", "opus_kb")
+    assert _resolve_pack_schema(None) == "opus_kb"
+
+    # Flag overrides env.
+    assert _resolve_pack_schema("alexandria_kb") == "alexandria_kb"
+
+
+def test_ingest_help_advertises_pack_schema_flag():
+    runner = CliRunner()
+    result = runner.invoke(main, ["ingest", "--help"])
+    assert result.exit_code == 0
+    assert "--pack-schema" in result.output
+
+
+def test_query_help_advertises_pack_schema_flag():
+    runner = CliRunner()
+    result = runner.invoke(main, ["query", "--help"])
+    assert result.exit_code == 0
+    assert "--pack-schema" in result.output
+
+
+def test_sync_help_advertises_pack_schema_flag():
+    runner = CliRunner()
+    result = runner.invoke(main, ["sync", "--help"])
+    assert result.exit_code == 0
+    assert "--pack-schema" in result.output

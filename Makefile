@@ -20,6 +20,12 @@ COMPOSE_FILE := infra/docker-compose.yml
 ENV_FILE     := .env
 PYTHON       := uv run python
 
+# M1-Multitenant deliverable 3: per-pack Postgres schema. Default keeps
+# `chio_kb` so the existing Phase 1.1 stack works unchanged. Override
+# with `make kb-up PACK_SCHEMA=alexandria_kb` to bring up an isolated
+# namespace for a second pack on the same Postgres database.
+PACK_SCHEMA  ?= chio_kb
+
 # == Phase 0 — always available ==
 
 help: ## list targets
@@ -71,9 +77,10 @@ kb-eval-outcomes-baseline: ## Phase 0: print Phase 0 baseline checklist (no runn
 
 # == Phase 1 — stack lifecycle ==
 
-kb-up: ## Phase 1: bring stack up (postgres + neo4j + graphiti + chio-kb-mcp)
+kb-up: ## Phase 1: bring stack up (postgres + neo4j + graphiti + chio-kb-mcp). Override PACK_SCHEMA= for isolated multitenant namespace.
 	@test -f $(COMPOSE_FILE) || { echo "blocked: Phase 1 — $(COMPOSE_FILE) missing"; exit 1; }
-	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) up -d
+	@echo "  → pack schema: $(PACK_SCHEMA)"
+	CHIO_KB_PACK_SCHEMA=$(PACK_SCHEMA) docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) up -d
 	@echo "  → waiting for chio-kb-mcp health…"
 	@for i in $$(seq 1 60); do \
 	  curl -fsS http://localhost:8111/health >/dev/null 2>&1 && echo "  ready" && exit 0; \
