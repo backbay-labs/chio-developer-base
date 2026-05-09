@@ -9,6 +9,15 @@
 | `conformance-harness-recall` | 20 | BLOCKED — runner | fixtures present; runner is Phase 1 deliverable |
 | `capability-error-explanation` | 10 | BLOCKED — runner | fixtures present; runner is Phase 1 deliverable |
 
+## M0 (Harden v0.1) — verification log
+
+- **2026-05-08:** calibration harness verified runnable end-to-end via
+  `cd chio-pack && uv run python -m chio_pack.eval.calibration --dry-run`.
+  Three deterministic raters (A/B/C) emit scores against the
+  `revoked-cap-still-presented` scenario and the harness produces a
+  well-formed JSON report with `disagreement_flags` populated. ADR-0002
+  Run-0 (real raters) still required before sign-off.
+
 ## Deferred (block on Phase 2)
 
 - `signed-retrieval` — blocked until **phase-2b**: Requires kb-engine/kb_engine/receipt/envelope.py — see PLAN.md Moonshot 2.
