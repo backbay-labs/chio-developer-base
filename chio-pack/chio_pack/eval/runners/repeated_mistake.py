@@ -29,14 +29,19 @@ Returns JSON to stdout:
       "by_kind": {<kind>: {"count": int, "documented": int}, ...},
       "needs_manual_review": <int>,
       "status": "ok" | "blocked-input",
-      "stub_warning": [<str>, ...]    # only present while stubs are in use
+      "stub_warning": [<str>, ...]   # only present while stubs are in use
+      "stubbed_kinds": [<str>, ...]  # mistake kinds whose classifier is a stub
     }
 
-The `stub_warning` field surfaces correctness debt: as long as
-`_candidate_notes_stub` returns `[]`, every mistake is judged
-"not documented" and `rate` is biased toward 0%. The warning falls
-off the JSON output once the real Phase 1 KB-backed candidate-note
-recovery is wired up. See ADR-0002 methodology-deltas.
+`stub_warning` surfaces correctness debt at the runner level: as long
+as `_candidate_notes_stub` returns `[]`, every mistake is judged
+"not documented" and `rate` is biased toward 0%.
+
+`stubbed_kinds` surfaces correctness debt at the classifier level:
+the kinds in this list are structurally under-counted because their
+heuristic.classify entry-point is a stub returning []. Both fields
+fall off the JSON output once the real implementations land. See
+ADR-0002 methodology-deltas.
 """
 from __future__ import annotations
 
@@ -63,6 +68,7 @@ class Aggregate:
     needs_manual_review: int = 0
     status: str = "ok"
     stub_warnings: list[str] = field(default_factory=list)
+    stubbed_kinds: list[str] = field(default_factory=list)
 
 
 # A sentinel attribute lets tests + the runner detect that the candidate-notes
@@ -132,9 +138,14 @@ def run(
 ) -> Aggregate:
     paths = sorted(pathlib.Path(p) for p in glob.glob(str(inputs_dir / "*.jsonl")))
     stub_warnings = _collect_active_stub_warnings()
+    stubbed_kinds = heuristic.stubbed_kinds()
 
     if not paths:
-        return Aggregate(status="blocked-input", stub_warnings=stub_warnings)
+        return Aggregate(
+            status="blocked-input",
+            stub_warnings=stub_warnings,
+            stubbed_kinds=stubbed_kinds,
+        )
 
     # Window: most recent N sessions
     paths = paths[-rolling_window:]
@@ -145,9 +156,14 @@ def run(
             n_sessions=len(paths),
             status="blocked-input",
             stub_warnings=stub_warnings,
+            stubbed_kinds=stubbed_kinds,
         )
 
-    agg = Aggregate(n_sessions=len(paths), stub_warnings=stub_warnings)
+    agg = Aggregate(
+        n_sessions=len(paths),
+        stub_warnings=stub_warnings,
+        stubbed_kinds=stubbed_kinds,
+    )
 
     for path in paths:
         events = session_log.load_session(path)
@@ -201,6 +217,8 @@ def main() -> int:
     }
     if agg.stub_warnings:
         out["stub_warning"] = agg.stub_warnings
+    if agg.stubbed_kinds:
+        out["stubbed_kinds"] = agg.stubbed_kinds
     print(json.dumps(out, indent=2))
     return 0 if agg.status == "ok" else 1
 

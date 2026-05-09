@@ -17,6 +17,7 @@ import pathlib
 import subprocess
 import sys
 
+from chio_pack.eval.classifiers import heuristic
 from chio_pack.eval.runners import repeated_mistake
 
 
@@ -51,6 +52,68 @@ def test_aggregate_carries_stub_warning_when_below_baseline(tmp_path):
     assert agg.status == "blocked-input"
     assert agg.n_sessions == 3
     assert any("Phase 1" in w for w in agg.stub_warnings)
+
+
+EXPECTED_STUBBED_KINDS = {
+    "superseded_quickly",
+    "wrong_capability_scope",
+    "bypassed_guard",
+}
+
+
+def test_heuristic_stubbed_kinds_lists_three_unimplemented_classifiers():
+    assert set(heuristic.stubbed_kinds()) == EXPECTED_STUBBED_KINDS
+
+
+def test_heuristic_stub_kind_warnings_keyed_by_kind():
+    warnings = heuristic.stub_kind_warnings()
+    assert set(warnings) == EXPECTED_STUBBED_KINDS
+    for kind, msg in warnings.items():
+        assert msg, f"empty rationale for {kind}"
+        assert "Phase 1" in msg, f"missing Phase 1 reference in {kind} rationale"
+
+
+def test_each_stubbed_classifier_currently_returns_empty():
+    # If a future change starts populating one of these, the
+    # corresponding entry in `_STUBBED_KIND_INFO` must also be removed.
+    for fn in (
+        heuristic._classify_superseded_quickly,
+        heuristic._classify_wrong_capability_scope,
+        heuristic._classify_bypassed_guard,
+    ):
+        assert fn([]) == [], f"{fn.__name__} no longer empty — update _STUBBED_KIND_INFO"
+
+
+def test_aggregate_carries_stubbed_kinds_when_blocked_on_inputs(tmp_path):
+    agg = repeated_mistake.run(tmp_path)
+    assert set(agg.stubbed_kinds) == EXPECTED_STUBBED_KINDS
+
+
+def test_runner_main_emits_stubbed_kinds_field(tmp_path):
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "chio_pack.eval.runners.repeated_mistake",
+            "--inputs",
+            str(sessions_dir),
+            "--baseline-min-sessions",
+            "20",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 1, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert "stubbed_kinds" in payload, (
+        f"expected stubbed_kinds in CLI output, got keys: {list(payload)}"
+    )
+    assert set(payload["stubbed_kinds"]) == EXPECTED_STUBBED_KINDS, payload[
+        "stubbed_kinds"
+    ]
 
 
 def test_runner_main_emits_stub_warning_field(tmp_path):

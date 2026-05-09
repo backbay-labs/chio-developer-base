@@ -126,27 +126,75 @@ def _classify_failed_then_re_edited(events: list[dict[str, Any]]) -> list[Mistak
     return mistakes
 
 
+# --- Stubbed classifiers ---------------------------------------------------
+#
+# The three classifiers below are stubs. They always return []. Until they
+# have real implementations, the repeated-mistake-rate metric structurally
+# under-counts mistakes of these kinds — a silent failure invisible to a
+# consumer reading only the JSON output.
+#
+# Each stub is registered in `_STUBBED_KIND_INFO` below. The runner reads
+# that registry to emit a `stubbed_kinds` field in its output JSON. When a
+# stub is replaced by a real implementation, the corresponding entry must
+# be removed from `_STUBBED_KIND_INFO` so the warning falls off cleanly.
+
+
 def _classify_superseded_quickly(events: list[dict[str, Any]]) -> list[Mistake]:
-    """ADR draft → superseded within 7 days. Cross-session in practice;
-    this stub returns []. Implemented in Phase 1+ when ADR transitions
-    are tracked across sessions via the vault-sync daemon.
-    """
+    # WARNING: stub. ADR draft → superseded within 7 days. Cross-session
+    # in practice; requires the vault-sync daemon's ADR transition log.
+    # See ADR-0002 methodology-deltas.
     return []
 
 
 def _classify_wrong_capability_scope(events: list[dict[str, Any]]) -> list[Mistake]:
-    """Edit grants/requests a capability scope later narrowed in the same
-    session. Requires arc-aware static analysis of capability literals.
-    Stubbed — Phase 1+.
-    """
+    # WARNING: stub. Edit grants/requests a capability scope later
+    # narrowed in the same session. Requires arc-aware static analysis
+    # of capability literals. See ADR-0002 methodology-deltas.
     return []
 
 
 def _classify_bypassed_guard(events: list[dict[str, Any]]) -> list[Mistake]:
-    """Edit disables/mocks a guard that the spec requires. Requires arc-
-    aware static analysis. Stubbed — Phase 1+.
-    """
+    # WARNING: stub. Edit disables/mocks a guard that the spec requires.
+    # Requires arc-aware static analysis of guard call sites.
+    # See ADR-0002 methodology-deltas.
     return []
+
+
+# Registry of currently-stubbed mistake kinds. The runner consumes this to
+# surface honest per-kind correctness debt in its output. To "land" a real
+# implementation: remove the entry here in the same change that replaces
+# the function body.
+_STUBBED_KIND_INFO: dict[str, str] = {
+    "superseded_quickly": (
+        "ADR draft transitions proposed → superseded within 7 days; "
+        "needs vault-sync ADR transition log (Phase 1+)."
+    ),
+    "wrong_capability_scope": (
+        "edit grants a capability scope later narrowed in the same "
+        "session; needs arc-aware static analysis of capability "
+        "literals (Phase 1+)."
+    ),
+    "bypassed_guard": (
+        "edit disables/mocks a required guard; needs arc-aware static "
+        "analysis of guard call sites (Phase 1+)."
+    ),
+}
+
+
+def stubbed_kinds() -> list[str]:
+    """Return the list of currently-stubbed mistake kinds.
+
+    The repeated-mistake runner uses this to emit a `stubbed_kinds`
+    field in its JSON output. As stubs are replaced by real
+    implementations, their entries are removed from
+    `_STUBBED_KIND_INFO` and this list shrinks automatically.
+    """
+    return sorted(_STUBBED_KIND_INFO)
+
+
+def stub_kind_warnings() -> dict[str, str]:
+    """Return human-readable rationale per currently-stubbed kind."""
+    return dict(_STUBBED_KIND_INFO)
 
 
 def classify(events: list[dict[str, Any]]) -> list[Mistake]:
