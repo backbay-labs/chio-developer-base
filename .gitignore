@@ -19,6 +19,13 @@ kb-engine/uv.lock
 # CocoIndex runtime state (Phase 1)
 .cocoindex/
 
+# vault-sync tombstones — per-day JSONL audit log of vault deletions
+# (vault/_meta/tombstones/YYYY-MM-DD.jsonl). These are operational
+# forensic data containing absolute source paths and content hashes;
+# ops ships them to cold storage rather than committing. The daemon
+# recreates the directory as needed.
+vault/_meta/tombstones/
+
 # === Obsidian ===
 # .obsidian/ holds the canonical config (community-plugins.json,
 # core-plugins.json, snippets, plugin data.json defaults, custom plugin source).
