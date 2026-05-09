@@ -20,6 +20,7 @@ def test_register_populates_all_four_hook_types():
     assert len(r.source_ingesters) == 1
     assert len(r.graph_projectors) == 1
     assert len(r.tool_registrars) == 1
+    assert len(r.constraint_providers) == 1
     expected_types = schema.GRAPHITI_TYPES | schema.NEO4J_TYPES
     assert set(r.frontmatter_handlers.keys()) == expected_types
 
@@ -150,3 +151,53 @@ def test_entry_point_loadable_via_registry():
     # After load, the same hooks should be present as direct register()
     assert len(r.source_ingesters) >= 1
     assert len(r.graph_projectors) >= 1
+
+
+# === ConstraintProvider — M1-Multitenant deliverable 2 ===
+
+
+def test_chio_bootstrap_constraints_returns_specs_for_known_labels():
+    """The pack's constraint provider must cover ChioFile, ChioCrate,
+    ChioCapability, ChioEntity at minimum (per the deliverable spec).
+    """
+    from kb_engine import ConstraintKind
+    from chio_pack.plugin import chio_bootstrap_constraints
+
+    specs = list(chio_bootstrap_constraints())
+    by_label = {s.label: s for s in specs}
+    # Sanity: the four labels named in the deliverable are present.
+    for required in (
+        schema.FILE,
+        schema.CRATE,
+        schema.CAPABILITY,
+        schema.ENTITY,
+    ):
+        assert required in by_label, f"missing constraint for {required}"
+
+    # ChioFile is keyed by path, ChioCrate by name; everything else by id.
+    assert by_label[schema.FILE].property == "path"
+    assert by_label[schema.CRATE].property == "name"
+    assert by_label[schema.CAPABILITY].property == "id"
+    assert by_label[schema.ENTITY].property == "id"
+
+    # All chio-pack specs default to UNIQUENESS — they lock identity.
+    assert all(s.kind == ConstraintKind.UNIQUENESS for s in specs)
+
+
+def test_registry_iter_constraint_specs_returns_chio_pack_specs():
+    """When chio-pack is registered, iter_constraint_specs() returns
+    its specs. When no plugin is loaded, it returns the empty list —
+    the engine has zero awareness of which packs exist.
+    """
+    empty = Registry()
+    assert empty.iter_constraint_specs() == []
+
+    r = Registry()
+    plugin.register(r)
+    specs = r.iter_constraint_specs()
+    assert len(specs) > 0
+    labels = {s.label for s in specs}
+    # chio-pack's superset must include the structural and concept nodes.
+    assert schema.FILE in labels
+    assert schema.CAPABILITY in labels
+    assert schema.ENTITY in labels

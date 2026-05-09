@@ -4,6 +4,8 @@ from __future__ import annotations
 import pytest
 
 from kb_engine import (
+    ConstraintKind,
+    ConstraintSpec,
     DerivedRecord,
     Edge,
     Node,
@@ -122,3 +124,52 @@ def test_node_and_edge_equal_by_value():
         src_id="x", dst_id="y", relationship="R"
     )
     assert Node(id="x", label="L") != Node(id="y", label="L")
+
+
+# === ConstraintProvider / iter_constraint_specs ===
+#
+# M1-Multitenant deliverable 2: packs declare Neo4j constraints
+# declaratively. The engine collects them via the registry without
+# knowing which labels exist.
+
+
+def test_iter_constraint_specs_empty_when_no_provider_registered():
+    """The engine has zero awareness of labels by default."""
+    r = Registry()
+    assert r.iter_constraint_specs() == []
+
+
+def test_iter_constraint_specs_unions_multiple_providers():
+    """Two packs sharing a registry both contribute specs."""
+    r = Registry()
+
+    def pack_a():
+        return [ConstraintSpec(label="PackANode", property="id")]
+
+    def pack_b():
+        yield ConstraintSpec(label="PackBNode", property="path")
+        yield ConstraintSpec(
+            label="PackBNode",
+            property="email",
+            kind=ConstraintKind.INDEX,
+        )
+
+    r.register_constraint_provider(pack_a)
+    r.register_constraint_provider(pack_b)
+
+    specs = r.iter_constraint_specs()
+    assert len(specs) == 3
+    labels = {s.label for s in specs}
+    assert labels == {"PackANode", "PackBNode"}
+
+
+def test_register_constraint_provider_rejects_non_callable():
+    r = Registry()
+    with pytest.raises(TypeError):
+        r.register_constraint_provider(42)  # type: ignore[arg-type]
+
+
+def test_constraint_spec_default_kind_is_uniqueness():
+    """Most pack specs lock identity, so UNIQUENESS is the default."""
+    spec = ConstraintSpec(label="X", property="id")
+    assert spec.kind == ConstraintKind.UNIQUENESS

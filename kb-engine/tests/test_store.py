@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from kb_engine import Edge, Node
+from kb_engine import ConstraintKind, ConstraintSpec, Edge, Node
 from kb_engine.store import FakeEmbedder, Neo4jStore, OpenAIEmbedder, PostgresStore
 from kb_engine.store.postgres import CodeChunk
 
@@ -381,3 +381,71 @@ def test_neo4j_delete_node_handles_no_record():
     session.run.return_value = result
     store = Neo4jStore(driver)
     assert store.delete_node("anything") == 0
+
+
+# === Neo4jStore — apply_constraint_specs (M1-Multitenant deliverable 2) ===
+
+
+def test_neo4j_apply_constraint_specs_renders_uniqueness_cypher():
+    driver, session = _mock_neo4j_driver()
+    store = Neo4jStore(driver)
+    n = store.apply_constraint_specs([
+        ConstraintSpec(label="ChioCapability", property="id"),
+        ConstraintSpec(label="ChioFile", property="path"),
+    ])
+    assert n == 2
+    cyphers = [c[0][0] for c in session.run.call_args_list]
+    # Each statement is the IF-NOT-EXISTS uniqueness form, with the
+    # auto-derived constraint name.
+    assert any(
+        "CREATE CONSTRAINT ChioCapability_id_uniqueness IF NOT EXISTS" in c
+        and "FOR (n:ChioCapability) REQUIRE n.id IS UNIQUE" in c
+        for c in cyphers
+    )
+    assert any(
+        "FOR (n:ChioFile) REQUIRE n.path IS UNIQUE" in c
+        for c in cyphers
+    )
+
+
+def test_neo4j_apply_constraint_specs_supports_index_and_existence():
+    driver, session = _mock_neo4j_driver()
+    store = Neo4jStore(driver)
+    store.apply_constraint_specs([
+        ConstraintSpec(
+            label="AlexandriaDoc",
+            property="indexed_at",
+            kind=ConstraintKind.INDEX,
+        ),
+        ConstraintSpec(
+            label="AlexandriaDoc",
+            property="title",
+            kind=ConstraintKind.EXISTENCE,
+        ),
+    ])
+    cyphers = [c[0][0] for c in session.run.call_args_list]
+    assert any("CREATE INDEX" in c and "FOR (n:AlexandriaDoc) ON (n.indexed_at)" in c
+               for c in cyphers)
+    assert any("REQUIRE n.title IS NOT NULL" in c for c in cyphers)
+
+
+def test_neo4j_apply_constraint_specs_rejects_unsafe_label():
+    """A label with a closing-backtick injection attempt is rejected."""
+    driver, _ = _mock_neo4j_driver()
+    store = Neo4jStore(driver)
+    with pytest.raises(ValueError, match="invalid label identifier"):
+        store.apply_constraint_specs([
+            ConstraintSpec(label="X` MATCH (n) DELETE n;//", property="id"),
+        ])
+    with pytest.raises(ValueError, match="invalid property identifier"):
+        store.apply_constraint_specs([
+            ConstraintSpec(label="X", property="id; DROP "),
+        ])
+
+
+def test_neo4j_apply_constraint_specs_empty_runs_nothing():
+    driver, session = _mock_neo4j_driver()
+    store = Neo4jStore(driver)
+    n = store.apply_constraint_specs([])
+    assert n == 0
+    assert session.run.call_count == 0

@@ -68,6 +68,24 @@ class IngestPipeline:
         self.neo4j = neo4j
         self.embedder = embedder
 
+    def bootstrap(self) -> int:
+        """Apply every loaded pack's Neo4j ConstraintSpecs once.
+
+        Idempotent — Cypher uses `IF NOT EXISTS` so re-running is safe.
+        Returns the number of specs applied (0 if no constraint
+        provider is registered or the pipeline has no Neo4j store).
+
+        Per M1-Multitenant deliverable 2: the engine collects specs
+        from `Registry.iter_constraint_specs()` and applies them
+        without ever knowing which pack supplied which label.
+        """
+        if self.neo4j is None:
+            return 0
+        specs = self.registry.iter_constraint_specs()
+        if not specs:
+            return 0
+        return self.neo4j.apply_constraint_specs(specs)
+
     def ingest_file(self, file_path: Path, source_root: Path) -> tuple[int, int, int]:
         """Run all hooks for a single file. Returns (n_nodes, n_edges, n_chunks)."""
         rel_path = str(file_path.relative_to(source_root))

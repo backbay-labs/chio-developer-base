@@ -14,9 +14,57 @@ bolt connection.
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Sequence
 
-from ..types import Edge, Node
+from ..types import ConstraintKind, ConstraintSpec, Edge, Node
+
+
+# Neo4j label/property names embed directly into Cypher (you can't bind
+# them as parameters), so we vet them before formatting. Allow ASCII
+# letters, digits, and underscores; reject anything that could break out
+# of the identifier and start a new statement.
+_NEO4J_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _safe_ident(name: str, kind: str) -> str:
+    """Validate `name` looks like a plain Cypher identifier."""
+    if not isinstance(name, str) or not _NEO4J_IDENT_RE.match(name):
+        raise ValueError(
+            f"invalid {kind} identifier {name!r}: must match "
+            f"{_NEO4J_IDENT_RE.pattern}"
+        )
+    return name
+
+
+def _spec_to_cypher(spec: ConstraintSpec) -> str:
+    """Render a ConstraintSpec as a single idempotent Cypher statement.
+
+    Uses `IF NOT EXISTS` everywhere so re-running on a database that
+    already has the constraint is a no-op. Auto-derives a constraint
+    name from label+property+kind when the spec doesn't supply one.
+    """
+    label = _safe_ident(spec.label, "label")
+    prop = _safe_ident(spec.property, "property")
+    name = spec.name or f"{label}_{prop}_{spec.kind.value.lower()}"
+    name = _safe_ident(name, "constraint name")
+
+    if spec.kind == ConstraintKind.UNIQUENESS:
+        return (
+            f"CREATE CONSTRAINT {name} IF NOT EXISTS "
+            f"FOR (n:{label}) REQUIRE n.{prop} IS UNIQUE"
+        )
+    if spec.kind == ConstraintKind.EXISTENCE:
+        return (
+            f"CREATE CONSTRAINT {name} IF NOT EXISTS "
+            f"FOR (n:{label}) REQUIRE n.{prop} IS NOT NULL"
+        )
+    if spec.kind == ConstraintKind.INDEX:
+        return (
+            f"CREATE INDEX {name} IF NOT EXISTS "
+            f"FOR (n:{label}) ON (n.{prop})"
+        )
+    raise ValueError(f"unknown ConstraintKind {spec.kind!r}")
 
 
 class Neo4jStore:
@@ -63,6 +111,23 @@ class Neo4jStore:
                 except Exception:
                     # Idempotent constraint application: ignore "already exists"
                     pass
+
+    def apply_constraint_specs(self, specs: Sequence[ConstraintSpec]) -> int:
+        """Apply ConstraintSpec objects (M1-Multitenant deliverable 2).
+
+        Renders each spec via `_spec_to_cypher` and runs them through
+        the same idempotent path as `apply_constraints()`. The engine
+        calls this once at bootstrap with the union of every loaded
+        pack's specs (via `Registry.iter_constraint_specs()`), so
+        adopters get pack-specific schema enforcement without the
+        engine knowing which labels exist.
+
+        Returns the number of specs actually attempted (== len(specs))
+        so callers can log "applied N constraint specs".
+        """
+        statements = [_spec_to_cypher(s) for s in specs]
+        self.apply_constraints(statements)
+        return len(statements)
 
     def upsert_nodes(self, nodes: Sequence[Node]) -> int:
         """Idempotent MERGE of nodes by (label, id). Returns count.

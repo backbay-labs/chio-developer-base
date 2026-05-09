@@ -25,6 +25,8 @@ from __future__ import annotations
 from typing import Any
 
 from kb_engine import (
+    ConstraintKind,
+    ConstraintSpec,
     DerivedRecord,
     Edge,
     Node,
@@ -153,6 +155,54 @@ def chio_frontmatter_handler(
     return out
 
 
+# === ConstraintProvider ===
+
+
+def chio_bootstrap_constraints() -> list[ConstraintSpec]:
+    """Declare Neo4j constraints for every Chio* node label.
+
+    Per M1-Multitenant deliverable 2: chio-pack ships its constraints
+    declaratively via ConstraintSpec rather than as raw Cypher in
+    `infra/neo4j/constraints.cypher`. The engine collects every loaded
+    pack's specs via `Registry.iter_constraint_specs()` and applies
+    them at bootstrap without knowing which labels exist.
+
+    The list mirrors the previous `infra/neo4j/constraints.cypher`
+    superset:
+      - High-level concept nodes use `id` for uniqueness.
+      - `ChioFile` is keyed by `path` (paths are stable).
+      - `ChioCrate` is keyed by `name`.
+      - Other structural nodes (ChioSymbol, ChioDoc, ChioSpec, …) use
+        `id`. Concept hubs (ChioConcept, ChioEntity) likewise.
+    """
+    by_id_labels = [
+        schema.CAPABILITY,
+        schema.RECEIPT,
+        schema.GUARD,
+        schema.POLICY,
+        schema.PROTOCOL,
+        schema.STANDARD,
+        schema.SYMBOL,
+        schema.DOC,
+        schema.SPEC,
+        schema.SECTION,
+        schema.CONCEPT,
+        schema.ENTITY,
+    ]
+    out: list[ConstraintSpec] = [
+        ConstraintSpec(label=label, property="id", kind=ConstraintKind.UNIQUENESS)
+        for label in by_id_labels
+    ]
+    # Structural nodes with non-`id` natural keys.
+    out.append(ConstraintSpec(
+        label=schema.FILE, property="path", kind=ConstraintKind.UNIQUENESS,
+    ))
+    out.append(ConstraintSpec(
+        label=schema.CRATE, property="name", kind=ConstraintKind.UNIQUENESS,
+    ))
+    return out
+
+
 # === Registry entry point ===
 
 
@@ -165,5 +215,6 @@ def register(registry: Registry) -> None:
     registry.register_source_ingester(rust_source_ingester)
     registry.register_graph_projector(chio_graph_projector)
     registry.register_tool_registrar(chio_tool_registrar)
+    registry.register_constraint_provider(chio_bootstrap_constraints)
     for type_ in schema.GRAPHITI_TYPES | schema.NEO4J_TYPES:
         registry.register_frontmatter_handler(type_, chio_frontmatter_handler)

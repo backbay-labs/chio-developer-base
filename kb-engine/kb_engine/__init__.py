@@ -22,6 +22,7 @@ framework that ToolRegistrar hooks into.
 """
 from .ingest import IngestPipeline, IngestStats
 from .plugin import (
+    ConstraintProvider,
     FrontmatterHandler,
     GraphProjector,
     Registry,
@@ -29,6 +30,8 @@ from .plugin import (
     ToolRegistrar,
 )
 from .types import (
+    ConstraintKind,
+    ConstraintSpec,
     DerivedRecord,
     Edge,
     Node,
@@ -45,6 +48,7 @@ __all__ = [
     "GraphProjector",
     "ToolRegistrar",
     "FrontmatterHandler",
+    "ConstraintProvider",
     "Registry",
     # Types
     "ParsedFile",
@@ -52,6 +56,8 @@ __all__ = [
     "Node",
     "Edge",
     "DerivedRecord",
+    "ConstraintSpec",
+    "ConstraintKind",
     # Pipeline
     "IngestPipeline",
     "IngestStats",
