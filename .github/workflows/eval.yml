@@ -13,9 +13,12 @@ name: eval
 #     baselines exist; flip continue-on-error: false here when baselines
 #     land — that's the final close-out of issue #5).
 #
-# The retrieval eval (PR #599's 9-category A floor) is NOT wired here.
-# It requires the docker stack to be running in CI. Add via
-# `make kb-eval-retrieval` once kb-up is reproducible in the runner.
+# The retrieval eval (PR #599's 9-category A floor) lives in a separate
+# workflow at .github/workflows/retrieval-a-gate.yml (added M0-D.4) so
+# the docker-stack-up job and this fast-feedback unit-test job don't
+# share a runner. The retrieval gate uses `make kb-eval-retrieval
+# --fail-below-a` against the live stack; this job stays fast and
+# secret-free.
 
 on:
   pull_request:

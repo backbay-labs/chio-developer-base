@@ -1,0 +1,167 @@
+name: retrieval-A gate
+
+# M0-D.4 — operationalize the regression floor that PR #599 set.
+#
+# AGENTS.md hard rule #5 says "Retrieval eval is the regression floor.
+# Overall A required across the 9 categories from PR #599. If
+# `make kb-eval` drops below A on retrieval, revert; don't patch."
+#
+# Until M0-D.4 the gate was documented but unwired (see eval.yml's
+# "The retrieval eval ... is NOT wired here" comment). This job is the
+# missing wire.
+#
+# REQUIRED SECRETS (configure under repo settings → Secrets → Actions):
+#   - OPENAI_API_KEY     — graphiti-mcp + chio-kb-mcp embedding/LLM calls
+#   - ANTHROPIC_API_KEY  — only required if CHIO_KB_LLM_MODEL points at
+#                          an Anthropic model; current default is
+#                          openai/gpt-4o-mini, so OpenAI is the load-
+#                          bearing one. Add as a defensive default.
+#
+# If those secrets are not configured the gate WILL fail. That is the
+# intended behavior — fail-loud beats fail-silent. See PLAN.md M0 risk
+# note: "the retrieval A-grade gate may fail on first run (if PR #599's
+# stack assumptions don't hold under the new ingest path); this is the
+# whole point — find it now, not in M2."
+#
+# KNOWN PHASE-1.1 BLOCKER:
+# infra/chio-kb-mcp-stub.py is the current chio-kb-mcp container — a
+# health-only stub (see infra/Dockerfile.chio-kb-mcp). The real MCP
+# gateway with the `chio-kb-eval` binary lands in Phase 1.3+. Until
+# then, `make kb-eval-retrieval` will fail at the
+# `docker compose ... exec chio-kb-mcp chio-kb-eval` step because the
+# binary doesn't exist in the image. THAT IS THE CORRECT CURRENT
+# BEHAVIOR — this workflow is the contract: when Phase 1.3 ships the
+# real gateway, the gate flips green without any workflow change. Until
+# then the failure is expected, visible, and self-explanatory in the
+# logs. We could have hidden this with a `continue-on-error: true`
+# stanza, but that would re-recreate the very `NOT wired` problem M0-D.4
+# was filed to close.
+#
+# DOCKER IMAGE AUTH:
+# infra/docker-compose.yml currently pulls only public images:
+#   - pgvector/pgvector:pg16       (Docker Hub, public)
+#   - neo4j:5.20-community         (Docker Hub, public)
+#   - zepai/knowledge-graph-mcp:standalone   (Docker Hub, public)
+#   - chio-kb-mcp                  (built in-tree from infra/Dockerfile.chio-kb-mcp)
+# No `docker login` step is needed today. If a future image becomes
+# private (e.g., a Chio-internal mirror on ghcr.io), add a step like:
+#
+#     - name: Authenticate to GHCR
+#       uses: docker/login-action@v3
+#       with:
+#         registry: ghcr.io
+#         username: ${{ github.actor }}
+#         password: ${{ secrets.GITHUB_TOKEN }}
+#
+# Do NOT inline credentials here.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# Cancel in-flight runs for the same PR / branch so a rapid push doesn't
+# stack three docker-compose ups in parallel (they'd fight for ports).
+concurrency:
+  group: retrieval-a-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  retrieval-a:
+    name: make kb-eval-retrieval --fail-below-a
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The retrieval eval indexes ../arc when CHIO_KB_REPO_ROOT is
+          # mounted to /workspace. PR #599's compose mounts ${ARC_REPO}
+          # which defaults to ../../arc; on the runner we don't have arc
+          # checked out so the mount degrades to an empty bind. The
+          # retrieval eval itself reads from the cocoindex pgvector
+          # snapshot, not from arc directly, so the empty mount is OK
+          # for the SCHEMA-VALIDATION pass. A full retrieval-A run
+          # against arc-indexed corpora is the next gate (Phase 1.x);
+          # see scratchpad.md M1.
+          fetch-depth: 1
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+
+      - name: Configure environment
+        # Provision the .env that infra/docker-compose.yml expects.
+        # Empty defaults are intentional — graphiti-mcp will fail-fast
+        # without a real OPENAI_API_KEY, surfacing the missing secret
+        # in the kb-up healthcheck rather than masking it.
+        run: |
+          cat > .env <<EOF
+          POSTGRES_DB=chio_kb
+          POSTGRES_USER=cocoindex
+          POSTGRES_PASSWORD=cocoindex
+          POSTGRES_PORT=55432
+          NEO4J_USER=neo4j
+          NEO4J_PASSWORD=demodemo
+          NEO4J_HTTP_PORT=7474
+          NEO4J_BOLT_PORT=7687
+          GRAPHITI_PORT=8000
+          GRAPHITI_GROUP_ID=chio-repo
+          GRAPHITI_TELEMETRY_ENABLED=false
+          CHIO_KB_MCP_PORT=8111
+          CHIO_KB_LLM_MODEL=openai/gpt-4o-mini
+          CHIO_KB_EMBED_MODEL=text-embedding-3-small
+          ARC_REPO=../arc
+          OPENAI_API_KEY=${OPENAI_API_KEY}
+          ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+          EOF
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Bring stack up (kb-postgres + kb-neo4j + graphiti-mcp + chio-kb-mcp)
+        # `make kb-up` builds chio-kb-mcp from infra/Dockerfile.chio-kb-mcp,
+        # then waits up to 120s for the health endpoint. If a service fails
+        # to come up the make target exits non-zero and the workflow fails.
+        run: make kb-up
+
+      - name: Retrieval eval (PR #599 fixtures, A floor)
+        # Calls `chio-kb-eval --suite retrieval --fail-below-a` inside the
+        # chio-kb-mcp container. The --fail-below-a flag is the regression
+        # gate: any drop below an A grade across the 9 PR-#599 categories
+        # exits non-zero and fails this job.
+        run: make kb-eval-retrieval
+
+      - name: Stack diagnostics on failure
+        if: failure()
+        run: |
+          echo "::group::docker compose ps"
+          docker compose -f infra/docker-compose.yml ps || true
+          echo "::endgroup::"
+          echo "::group::chio-kb-mcp logs (tail 200)"
+          docker compose -f infra/docker-compose.yml logs --tail 200 chio-kb-mcp || true
+          echo "::endgroup::"
+          echo "::group::graphiti-mcp logs (tail 100)"
+          docker compose -f infra/docker-compose.yml logs --tail 100 graphiti-mcp || true
+          echo "::endgroup::"
+          echo "::group::kb-postgres logs (tail 50)"
+          docker compose -f infra/docker-compose.yml logs --tail 50 kb-postgres || true
+          echo "::endgroup::"
+
+      - name: Tear stack down
+        # Always-run cleanup so the runner doesn't leak postgres/neo4j
+        # processes between jobs. `make kb-down` does `docker compose
+        # down` (containers only — volumes survive); CI runners are
+        # ephemeral so volume retention is irrelevant.
+        if: always()
+        run: make kb-down
