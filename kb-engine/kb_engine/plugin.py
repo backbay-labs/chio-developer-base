@@ -37,7 +37,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
-from .types import DerivedRecord, Edge, Node, ParsedFile
+from .types import ConstraintSpec, DerivedRecord, Edge, Node, ParsedFile
 
 
 # === Hook protocols ===
@@ -87,6 +87,21 @@ class FrontmatterHandler(Protocol):
     ) -> Iterable[DerivedRecord]: ...
 
 
+@runtime_checkable
+class ConstraintProvider(Protocol):
+    """Declare Neo4j schema constraints a pack needs at bootstrap.
+
+    M1-Multitenant deliverable 2: packs ship a `bootstrap_constraints`
+    callable returning ConstraintSpec objects describing labels they
+    own (chio-pack: ChioCapability, ChioFile, …). The engine collects
+    every pack's specs and applies them once at ingest startup, so
+    adopters get pack-specific constraints automatically and the
+    engine stays ignorant of which labels exist.
+    """
+
+    def __call__(self) -> Iterable[ConstraintSpec]: ...
+
+
 # === Registry ===
 
 
@@ -132,6 +147,7 @@ class Registry:
     graph_projectors: list[GraphProjector] = field(default_factory=list)
     tool_registrars: list[ToolRegistrar] = field(default_factory=list)
     frontmatter_handlers: dict[str, list[FrontmatterHandler]] = field(default_factory=dict)
+    constraint_providers: list[ConstraintProvider] = field(default_factory=list)
     # Internal: builtin ingesters seeded on construction. Checked AFTER
     # pack/user-registered hooks so pack > builtin precedence is explicit.
     _builtin_source_ingesters: list[SourceIngester] = field(default_factory=list)
@@ -198,6 +214,19 @@ class Registry:
         if not isinstance(hook, FrontmatterHandler) and not callable(hook):
             raise TypeError(f"hook {hook!r} is not callable / not a FrontmatterHandler")
         self.frontmatter_handlers.setdefault(type_value, []).append(hook)
+
+    def register_constraint_provider(self, hook: ConstraintProvider) -> None:
+        """Register a callable that returns ConstraintSpec objects.
+
+        Per M1-Multitenant deliverable 2: each pack registers its own
+        constraint provider here; the engine never hard-codes Chio (or
+        any other pack's) labels.
+        """
+        if not isinstance(hook, ConstraintProvider) and not callable(hook):
+            raise TypeError(
+                f"hook {hook!r} is not callable / not a ConstraintProvider"
+            )
+        self.constraint_providers.append(hook)
 
     # === Entry-point loading ===
 
@@ -267,4 +296,17 @@ class Registry:
             out.extend(hook(type_value, frontmatter))
         for hook in self.frontmatter_handlers.get("*", []):
             out.extend(hook(type_value, frontmatter))
+        return out
+
+    def iter_constraint_specs(self) -> list[ConstraintSpec]:
+        """Collect every registered pack's ConstraintSpecs.
+
+        Returns an empty list when no provider is registered — the
+        engine's "no Chio knowledge" rule. Callers (the ingest
+        pipeline at bootstrap time) hand this list to
+        Neo4jStore.apply_constraint_specs().
+        """
+        out: list[ConstraintSpec] = []
+        for provider in self.constraint_providers:
+            out.extend(provider())
         return out

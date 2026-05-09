@@ -35,6 +35,24 @@ import click
 
 REPO_ROOT_HINT = "Run from the chio-developer-base/ root (or set CHIO_DEV_REPO)."
 
+# The Postgres schema chio-dev's `ingest`/`sync`/`query` subcommands write
+# to. Per M1-Multitenant deliverable 3, the schema is configurable so a
+# second pack on the same Postgres database doesn't collide. Default
+# preserves Phase 1.1's behaviour: writes go to `chio_kb`.
+DEFAULT_PACK_SCHEMA = "chio_kb"
+
+
+def _resolve_pack_schema(flag_value: str | None) -> str:
+    """Resolve the pack schema in priority order.
+
+    1. The `--pack-schema` CLI flag, if set.
+    2. The `CHIO_KB_PACK_SCHEMA` environment variable.
+    3. The default (`chio_kb`).
+    """
+    if flag_value:
+        return flag_value
+    return os.environ.get("CHIO_KB_PACK_SCHEMA", DEFAULT_PACK_SCHEMA)
+
 
 def _repo_root() -> Path:
     """Best-effort repo root detection. Walk up looking for PLAN.md + Makefile."""
@@ -139,7 +157,20 @@ def migrate_seeds(seeds_dir: str | None, vault: str, branch: str) -> None:
 @click.argument("vault_path", required=False)
 @click.option("--watch", is_flag=True, help="Run forever (watchdog/polling).")
 @click.option("--state", default=None, help="Path to sync state JSON (default: ~/.chio-dev/vault-sync.state.json)")
-def sync(vault_path: str | None, watch: bool, state: str | None) -> None:
+@click.option(
+    "--pack-schema",
+    default=None,
+    help=(
+        "Postgres schema for any direct pgvector writes from sync. "
+        "Default: $CHIO_KB_PACK_SCHEMA or 'chio_kb'."
+    ),
+)
+def sync(
+    vault_path: str | None,
+    watch: bool,
+    state: str | None,
+    pack_schema: str | None,
+) -> None:
     """Run the vault-sync daemon. One-shot by default; --watch for forever.
 
     VAULT_PATH defaults to <repo>/vault.
@@ -147,6 +178,12 @@ def sync(vault_path: str | None, watch: bool, state: str | None) -> None:
     repo = _repo_root()
     vault_root = Path(vault_path) if vault_path else repo / "vault"
     state_path = Path(state) if state else Path.home() / ".chio-dev" / "vault-sync.state.json"
+
+    schema = _resolve_pack_schema(pack_schema)
+    # Surface the schema even though today's sync routers don't yet use
+    # PostgresStore directly — when they do (Phase 1.4+), the resolved
+    # schema is already threaded through the CLI surface.
+    click.secho(f"Pack schema: {schema}", fg="green", err=True)
 
     from kb_engine import Registry
     from kb_engine.sync import JsonlRouter, NullRouter, VaultSyncDaemon
@@ -189,11 +226,21 @@ def sync(vault_path: str | None, watch: bool, state: str | None) -> None:
 )
 @click.option("--no-postgres", is_flag=True, help="Skip embedding/pgvector ingest")
 @click.option("--no-neo4j", is_flag=True, help="Skip graph projection/neo4j")
+@click.option(
+    "--pack-schema",
+    default=None,
+    help=(
+        "Postgres schema for this pack's data. Default: $CHIO_KB_PACK_SCHEMA "
+        "or 'chio_kb'. Use a distinct value (e.g. 'alexandria_kb') to share "
+        "one Postgres database across packs."
+    ),
+)
 def ingest(
     source_root: str | None,
     sources_path: str | None,
     no_postgres: bool,
     no_neo4j: bool,
+    pack_schema: str | None,
 ) -> None:
     """Run the ingest pipeline.
 
@@ -221,6 +268,9 @@ def ingest(
     )
 
     repo = _repo_root()
+
+    schema = _resolve_pack_schema(pack_schema)
+    click.secho(f"Pack schema: {schema}", fg="green", err=True)
 
     registry = Registry()
     n_loaded = registry.load_entry_points()
@@ -262,7 +312,7 @@ def ingest(
         if url:
             try:
                 from kb_engine.store import PostgresStore
-                postgres = PostgresStore.from_url(url)
+                postgres = PostgresStore.from_url(url, schema=schema)
                 postgres.bootstrap()
             except RuntimeError as e:
                 click.secho(f"warning: postgres unavailable: {e}", fg="yellow", err=True)
@@ -296,12 +346,14 @@ def ingest(
 
     pipeline = IngestPipeline(registry, postgres=postgres, neo4j=neo4j_store, embedder=embedder)
 
-    # Dispatch loop: visit each [[source]] entry. We walk all sources
-    # against the same Registry — sources.toml does not currently
-    # restrict ingest to "this pack only" because the Registry's
-    # SourceIngester contract is "first non-None claim wins" and any
-    # pack that recognises a file in that tree is welcome to ingest it.
-    # Future: per-source registry views once multi-tenant lands.
+    n_constraints = pipeline.bootstrap()
+    if n_constraints:
+        click.secho(
+            f"Applied {n_constraints} pack constraint spec(s) to Neo4j.",
+            fg="green",
+            err=True,
+        )
+
     aggregate_files_seen = 0
     aggregate_files_ingested = 0
     aggregate_nodes = 0
@@ -342,6 +394,7 @@ def ingest(
             "nodes_upserted": aggregate_nodes,
             "edges_upserted": aggregate_edges,
             "chunks_inserted": aggregate_chunks,
+            "pack_schema": schema,
             "sources": per_source,
         },
         indent=2,
@@ -351,7 +404,15 @@ def ingest(
 @main.command()
 @click.argument("query")
 @click.option("--limit", default=10)
-def query(query: str, limit: int) -> None:
+@click.option(
+    "--pack-schema",
+    default=None,
+    help=(
+        "Postgres schema to query. Default: $CHIO_KB_PACK_SCHEMA or "
+        "'chio_kb'. Must match the schema used at ingest time."
+    ),
+)
+def query(query: str, limit: int, pack_schema: str | None) -> None:
     """Phase 1.3+ retrieval. Today, calls pgvector similarity search."""
     from kb_engine.store import OpenAIEmbedder, PostgresStore
 
@@ -363,8 +424,10 @@ def query(query: str, limit: int) -> None:
         click.secho("error: OPENAI_API_KEY not set (required to embed query)", fg="red", err=True)
         sys.exit(2)
 
+    schema = _resolve_pack_schema(pack_schema)
+
     try:
-        store = PostgresStore.from_url(url)
+        store = PostgresStore.from_url(url, schema=schema)
         embedder = OpenAIEmbedder()
         vec = embedder([query])[0]
         results = store.search_similar(vec, limit=limit)

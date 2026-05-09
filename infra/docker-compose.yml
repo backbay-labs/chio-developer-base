@@ -99,6 +99,10 @@ services:
       CHIO_KB_REPO_ROOT: /workspace
       CHIO_KB_MCP_HOST: 0.0.0.0
       CHIO_KB_MCP_PORT: 8111
+      # M1-Multitenant: pack-scoped Postgres schema. Defaults to `chio_kb`
+      # so the Phase 1.1 stack keeps working; override with
+      # `make kb-up PACK_SCHEMA=alexandria_kb` for isolated namespaces.
+      CHIO_KB_PACK_SCHEMA: ${CHIO_KB_PACK_SCHEMA:-chio_kb}
     ports:
       - "${CHIO_KB_MCP_PORT:-8111}:8111"
     volumes:

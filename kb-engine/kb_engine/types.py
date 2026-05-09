@@ -9,6 +9,7 @@ No Chio knowledge here. Field names are domain-agnostic.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
 
 
@@ -85,3 +86,40 @@ class DerivedRecord:
 
     target: str  # "graphiti" | "pgvector" | "neo4j" | <plugin-defined>
     payload: dict[str, Any]
+
+
+class ConstraintKind(str, Enum):
+    """The flavor of constraint to register on a Neo4j label/property pair.
+
+    Mirrors the three constraint forms Neo4j 5 supports without tying
+    callers to Cypher syntax. The engine's Neo4j store renders these
+    into the appropriate `CREATE CONSTRAINT` / `CREATE INDEX` statement
+    when applying a pack's specs.
+    """
+
+    UNIQUENESS = "UNIQUENESS"
+    EXISTENCE = "EXISTENCE"
+    INDEX = "INDEX"
+
+
+@dataclass(frozen=True)
+class ConstraintSpec:
+    """A Neo4j constraint declared by a pack at bootstrap time.
+
+    Per M1-Multitenant deliverable 2: packs declare constraints
+    declaratively (label + property + kind) rather than emitting
+    Cypher strings. The engine renders the spec into the right
+    `CREATE CONSTRAINT IF NOT EXISTS` form. This keeps kb-engine
+    ignorant of which labels exist (chio-pack's `ChioCapability`,
+    alexandria-pack's `AlexandriaDoc`, …) while still letting it
+    apply the right schema to Neo4j idempotently.
+
+    `name` is optional — if omitted, the engine derives one from
+    label+property+kind so re-runs see "constraint already exists"
+    and skip cleanly.
+    """
+
+    label: str
+    property: str
+    kind: ConstraintKind = ConstraintKind.UNIQUENESS
+    name: str | None = None
