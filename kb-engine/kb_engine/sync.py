@@ -416,6 +416,92 @@ class VaultSyncDaemon:
         self.state.hashes[rel] = h
         return n_routed, "processed"
 
+    def move_file(self, src: Path, dest: Path) -> tuple[str, str | None, str | None]:
+        """Handle a rename event. Returns (action, old_id, new_id).
+
+        Watchdog can deliver a rename as either `on_moved(src, dest)`
+        or as `on_deleted(src) + on_created(dest)` — platform-dependent.
+        This entry point handles the unified case.
+
+        Decision rule:
+
+          - If the frontmatter `id` is unchanged across the rename,
+            preserve graph identity. State is moved from src to dest;
+            process_file(dest) re-derives if content changed (the
+            store's MERGE-on-id keeps the node intact). NO deletion is
+            emitted.
+
+          - If the `id` changed (or src had no tracked id and dest has
+            one — treated as a fresh create) emit a delete for the old
+            id and process_file(dest) for the new one.
+
+          - If dest is unreadable / has no frontmatter, treat as a
+            delete of src (the rename effectively destroyed the note).
+
+        Returns:
+          - action: one of "renamed_same_id", "renamed_new_id",
+                    "create_only", "delete_only", "noop".
+          - old_id: src's tracked id (or None if untracked).
+          - new_id: dest's frontmatter id (or None if dest has none).
+        """
+        src_rel = str(src)
+        old_meta = self.state.meta.get(src_rel, {})
+        old_id = old_meta.get("id")
+
+        # If dest doesn't exist or is unreadable, treat as a deletion
+        # of src — the rename event lied about the destination.
+        if not dest.is_file():
+            self.delete_file(src)
+            return "delete_only", old_id, None
+
+        try:
+            text = dest.read_text(encoding="utf-8")
+        except OSError:
+            self.delete_file(src)
+            return "delete_only", old_id, None
+
+        frontmatter, _ = _parse_frontmatter(text)
+        new_id = frontmatter.get("id") if frontmatter else None
+
+        # Case 1: identity-preserving rename. The store's MERGE-on-id
+        # keeps the existing node; we just move the state entry to the
+        # new path so future content checks find it. Then re-process
+        # to pick up any same-rename content edits.
+        if old_id is not None and new_id is not None and str(old_id) == str(new_id):
+            self.state.forget(src_rel)
+            self.process_file(dest)
+            return "renamed_same_id", str(old_id), str(new_id)
+
+        # Case 2: id changed across rename — emit delete+create. The
+        # delete propagates to the Router so the old node is removed
+        # from derived stores; process_file then re-derives the new id.
+        if old_id is not None and new_id is not None:
+            self.delete_file(src)
+            self.process_file(dest)
+            return "renamed_new_id", str(old_id), str(new_id)
+
+        # Case 3: src was untracked (no id) but dest has one — treat
+        # as a fresh create. Just process dest.
+        if old_id is None and new_id is not None:
+            # Make sure no stale src state lingers (e.g., a no-id state
+            # entry from a prior process_file).
+            self.state.forget(src_rel)
+            self.process_file(dest)
+            return "create_only", None, str(new_id)
+
+        # Case 4: src tracked, dest has no id — treat as delete of src.
+        if old_id is not None and new_id is None:
+            self.delete_file(src)
+            # Still update state for dest so we don't re-derive on next
+            # poll if frontmatter is missing.
+            self.process_file(dest)
+            return "delete_only", str(old_id), None
+
+        # Case 5: nothing tracked, nothing to derive. Just process dest
+        # so any new state entry is recorded.
+        self.process_file(dest)
+        return "noop", None, None
+
     def delete_file(self, path: Path) -> tuple[bool, str | None]:
         """Handle deletion of a vault file. Returns (emitted, node_id).
 
@@ -495,6 +581,28 @@ class VaultSyncDaemon:
                 if not event.is_directory and str(event.src_path).endswith(".md"):
                     daemon.delete_file(Path(event.src_path))
                     daemon.state.save()
+
+            def on_moved(self, event):
+                # Watchdog's MovedEvent has both src_path and dest_path.
+                # Some platforms deliver a rename as on_deleted +
+                # on_created instead; both paths converge to the same
+                # state via delete_file / process_file, so handling
+                # either form is sufficient.
+                if event.is_directory:
+                    return
+                src = str(event.src_path)
+                dest = str(event.dest_path)
+                if not src.endswith(".md") and not dest.endswith(".md"):
+                    return
+                # If src wasn't .md but dest is, treat as a create at dest.
+                if not src.endswith(".md"):
+                    daemon.process_file(Path(dest))
+                # If dest isn't .md but src was, treat as a delete of src.
+                elif not dest.endswith(".md"):
+                    daemon.delete_file(Path(src))
+                else:
+                    daemon.move_file(Path(src), Path(dest))
+                daemon.state.save()
 
         observer = Observer()
         observer.schedule(_Handler(), str(vault_root), recursive=True)

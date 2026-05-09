@@ -506,6 +506,197 @@ def test_daemon_delete_file_skips_when_no_frontmatter_id(tmp_path):
     assert str(note) not in daemon.state.hashes
 
 
+# === Rename / move handling (M0-C.2) ===
+
+
+def test_move_file_same_id_preserves_identity(tmp_path):
+    """Renaming a note while keeping its frontmatter `id` should NOT
+    emit a delete record — the store's MERGE-on-id keeps the same
+    graph node, only the source path moved.
+    """
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    src = vault / "old.md"
+    src.write_text("---\ntype: spec\nid: spec.x\n---\nBody\n")
+
+    registry = _build_registry_with_handler()
+    router = NullRouter()
+    daemon = VaultSyncDaemon(registry, [router], state_path=tmp_path / "state.json")
+    daemon.run_once(vault)
+    assert len(router.received) == 1
+
+    dest = vault / "new.md"
+    src.rename(dest)
+    action, old_id, new_id = daemon.move_file(src, dest)
+
+    assert action == "renamed_same_id"
+    assert old_id == "spec.x"
+    assert new_id == "spec.x"
+    # No delete record — identity preserved
+    assert router.deleted == []
+    # State moved to dest
+    assert str(src) not in daemon.state.hashes
+    assert str(dest) in daemon.state.hashes
+    assert daemon.state.meta[str(dest)]["id"] == "spec.x"
+    # Re-derivation happened (content unchanged from src so handler
+    # ran but the same record was emitted again — that's fine; the
+    # store MERGEs on id idempotently).
+    assert len(router.received) == 2
+
+
+def test_move_file_changed_id_emits_delete_plus_create(tmp_path):
+    """Renaming with a frontmatter-id change is a delete+create —
+    graph identity does not survive."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    src = vault / "old.md"
+    src.write_text("---\ntype: spec\nid: spec.old\n---\nBody\n")
+
+    registry = _build_registry_with_handler()
+    router = NullRouter()
+    daemon = VaultSyncDaemon(registry, [router], state_path=tmp_path / "state.json")
+    daemon.run_once(vault)
+
+    dest = vault / "new.md"
+    dest.write_text("---\ntype: spec\nid: spec.new\n---\nBody\n")
+    src.unlink()
+    action, old_id, new_id = daemon.move_file(src, dest)
+
+    assert action == "renamed_new_id"
+    assert old_id == "spec.old"
+    assert new_id == "spec.new"
+    # Delete record for the old id reached the router
+    assert router.deleted == [("spec.old", src)]
+    # New record was derived for the new id
+    assert any(r.payload.get("id") == "spec.new" for r in router.received)
+    assert daemon.state.meta[str(dest)]["id"] == "spec.new"
+    assert str(src) not in daemon.state.hashes
+
+
+def test_move_file_dest_missing_falls_back_to_delete(tmp_path):
+    """If watchdog reports a move but dest doesn't exist by the time
+    we look (race), treat as delete of src — never silently lose a
+    deletion."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    src = vault / "old.md"
+    src.write_text("---\ntype: spec\nid: spec.x\n---\n")
+
+    registry = _build_registry_with_handler()
+    router = NullRouter()
+    daemon = VaultSyncDaemon(registry, [router], state_path=tmp_path / "state.json")
+    daemon.run_once(vault)
+
+    # src no longer exists; dest never appeared
+    src.unlink()
+    dest = vault / "ghost.md"
+    action, old_id, new_id = daemon.move_file(src, dest)
+    assert action == "delete_only"
+    assert old_id == "spec.x"
+    assert new_id is None
+    assert router.deleted == [("spec.x", src)]
+
+
+def test_move_file_dest_has_no_id_treated_as_delete(tmp_path):
+    """A rename whose dest lost its frontmatter id is a delete of src
+    — the new file is meaningless to the derived stores."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    src = vault / "old.md"
+    src.write_text("---\ntype: spec\nid: spec.x\n---\n")
+
+    registry = _build_registry_with_handler()
+    router = NullRouter()
+    daemon = VaultSyncDaemon(registry, [router], state_path=tmp_path / "state.json")
+    daemon.run_once(vault)
+
+    dest = vault / "noid.md"
+    dest.write_text("---\ntype: spec\n---\nBody no id\n")
+    src.unlink()
+    action, old_id, new_id = daemon.move_file(src, dest)
+    assert action == "delete_only"
+    assert old_id == "spec.x"
+    assert router.deleted == [("spec.x", src)]
+
+
+def test_move_file_untracked_src_with_id_in_dest(tmp_path):
+    """Renaming from a file we never tracked (e.g., it was just created
+    in this scan tick) into a tracked id is a "create_only" action."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    registry = _build_registry_with_handler()
+    router = NullRouter()
+    daemon = VaultSyncDaemon(registry, [router], state_path=tmp_path / "state.json")
+
+    src = vault / "old.md"
+    dest = vault / "new.md"
+    dest.write_text("---\ntype: spec\nid: spec.fresh\n---\n")
+    action, old_id, new_id = daemon.move_file(src, dest)
+    assert action == "create_only"
+    assert old_id is None
+    assert new_id == "spec.fresh"
+    assert router.deleted == []
+    assert any(r.payload.get("id") == "spec.fresh" for r in router.received)
+
+
+def test_watchdog_on_moved_dispatches_to_move_file(tmp_path):
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    src = vault / "old.md"
+    src.write_text("---\ntype: spec\nid: spec.x\n---\n")
+
+    registry = _build_registry_with_handler()
+    router = NullRouter()
+    daemon = VaultSyncDaemon(registry, [router], state_path=tmp_path / "state.json")
+    daemon.run_once(vault)
+
+    class _StubObserver:
+        def __init__(self):
+            self.handler = None
+
+        def schedule(self, handler, root, recursive):
+            self.handler = handler
+
+        def start(self):
+            raise _StubStop()
+
+        def stop(self):
+            pass
+
+        def join(self):
+            pass
+
+    class _StubStop(Exception):
+        pass
+
+    class _StubHandler:
+        is_directory = False
+
+    captured = _StubObserver()
+    try:
+        daemon._run_with_watchdog(vault, lambda: captured, _StubHandler)
+    except _StubStop:
+        pass
+
+    handler = captured.handler
+
+    dest = vault / "new.md"
+    src.rename(dest)
+
+    class _MoveEvent:
+        def __init__(self, s, d):
+            self.is_directory = False
+            self.src_path = str(s)
+            self.dest_path = str(d)
+
+    handler.on_moved(_MoveEvent(src, dest))
+    # Same-id rename: no deletion, but state moved
+    assert router.deleted == []
+    assert str(dest) in daemon.state.hashes
+    assert str(src) not in daemon.state.hashes
+
+
 def test_graphiti_router_increments_jsonrpc_id_per_call():
     sent: list = []
 
