@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 authors = [{ name = "Backbay" }]
 dependencies = [
     "pyyaml>=6.0",
-    "kb-engine",
+    "kb-engine[all]",
     "click>=8.1",
 ]
 

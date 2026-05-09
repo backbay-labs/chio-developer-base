@@ -7,6 +7,7 @@ import pytest
 
 from kb_engine import DerivedRecord, Registry
 from kb_engine.sync import (
+    GraphitiHttpRouter,
     JsonlRouter,
     NullRouter,
     SyncState,
@@ -228,3 +229,121 @@ def test_content_hash_changes_with_content():
     b = _content_hash("hello world")
     assert a != b
     assert a.startswith("sha256:")
+
+
+# === GraphitiHttpRouter ===
+
+
+class _FakeResponse:
+    def __init__(self, status_code: int = 200, text: str = '{"result": {}}'):
+        self.status_code = status_code
+        self.text = text
+
+
+def test_graphiti_router_posts_episode():
+    sent: list = []
+
+    def fake_post(url, json):
+        sent.append((url, json))
+        return _FakeResponse(200)
+
+    router = GraphitiHttpRouter("http://localhost:8000/mcp", post=fake_post)
+    n = router.write([
+        DerivedRecord(target="graphiti", payload={
+            "name": "Test episode",
+            "source_description": "Test seed",
+            "frontmatter": {"id": "ep.test"},
+        })
+    ])
+    assert n == 1
+    url, envelope = sent[0]
+    assert url == "http://localhost:8000/mcp"
+    assert envelope["jsonrpc"] == "2.0"
+    assert envelope["method"] == "tools/call"
+    assert envelope["params"]["name"] == "add_memory"
+    assert envelope["params"]["arguments"]["name"] == "Test episode"
+
+
+def test_graphiti_router_skips_non_graphiti_records():
+    sent: list = []
+
+    def fake_post(url, json):
+        sent.append((url, json))
+        return _FakeResponse(200)
+
+    router = GraphitiHttpRouter("http://localhost:8000/mcp", post=fake_post)
+    records = [
+        DerivedRecord(target="neo4j", payload={"id": "x"}),
+        DerivedRecord(target="graphiti", payload={"name": "Y"}),
+        DerivedRecord(target="audit-log", payload={}),
+    ]
+    n = router.write(records)
+    assert n == 1
+    assert len(sent) == 1
+
+
+def test_graphiti_router_handles_http_errors_non_strict():
+    def fake_post(url, json):
+        return _FakeResponse(500, text="server error")
+
+    router = GraphitiHttpRouter("http://localhost:8000/mcp", post=fake_post)
+    n = router.write([DerivedRecord(target="graphiti", payload={"name": "X"})])
+    assert n == 0
+    assert len(router.failures) == 1
+    assert "HTTP 500" in router.failures[0][1]
+
+
+def test_graphiti_router_strict_raises_on_http_error():
+    def fake_post(url, json):
+        return _FakeResponse(500, text="boom")
+
+    router = GraphitiHttpRouter(
+        "http://localhost:8000/mcp", post=fake_post, strict=True
+    )
+    with pytest.raises(RuntimeError, match="Graphiti POST failed"):
+        router.write([DerivedRecord(target="graphiti", payload={"name": "X"})])
+
+
+def test_graphiti_router_handles_post_exception_non_strict():
+    def fake_post(url, json):
+        raise ConnectionError("network down")
+
+    router = GraphitiHttpRouter("http://localhost:8000/mcp", post=fake_post)
+    n = router.write([DerivedRecord(target="graphiti", payload={"name": "X"})])
+    assert n == 0
+    assert "network down" in router.failures[0][1]
+
+
+def test_graphiti_router_falls_back_to_frontmatter_for_episode_body():
+    sent: list = []
+
+    def fake_post(url, json):
+        sent.append((url, json))
+        return _FakeResponse(200)
+
+    router = GraphitiHttpRouter("http://localhost:8000/mcp", post=fake_post)
+    router.write([
+        DerivedRecord(target="graphiti", payload={
+            "name": "Y",
+            "frontmatter": {"id": "y", "type": "episode-architecture-summary"},
+        })
+    ])
+    body = sent[0][1]["params"]["arguments"]["episode_body"]
+    assert "episode-architecture-summary" in body
+
+
+def test_graphiti_router_increments_jsonrpc_id_per_call():
+    sent: list = []
+
+    def fake_post(url, json):
+        sent.append(json)
+        return _FakeResponse(200)
+
+    router = GraphitiHttpRouter("http://localhost:8000/mcp", post=fake_post)
+    router.write([
+        DerivedRecord(target="graphiti", payload={"name": "A"}),
+        DerivedRecord(target="graphiti", payload={"name": "B"}),
+    ])
+    ids = [e["id"] for e in sent]
+    assert len(ids) == 2
+    assert ids[0] != ids[1]

@@ -88,6 +88,96 @@ class JsonlRouter:
         return n
 
 
+class GraphitiHttpRouter:
+    """POSTs Graphiti-target records to a graphiti-mcp HTTP endpoint.
+
+    Per AGENTS.md hard rule #1, this is the designated Graphiti writer.
+    Plugin code never writes Graphiti directly — it produces
+    DerivedRecord(target="graphiti", ...) objects, which the daemon
+    routes through this class.
+
+    Records with target != "graphiti" are skipped. Each Graphiti record
+    becomes one MCP JSON-RPC `tools/call` envelope, by default invoking
+    the `add_memory` tool. Constructor takes the MCP URL plus optional
+    overrides (tool_name, timeout, strict). For tests the underlying
+    HTTP `post` callable is dependency-injected so no real httpx is
+    needed.
+    """
+
+    DEFAULT_TOOL = "add_memory"
+
+    def __init__(
+        self,
+        url: str,
+        *,
+        tool_name: str = DEFAULT_TOOL,
+        timeout_seconds: float = 30.0,
+        strict: bool = False,
+        post: Any = None,
+    ) -> None:
+        self.url = url
+        self.tool_name = tool_name
+        self.timeout_seconds = timeout_seconds
+        self.strict = strict
+        self._post = post
+        self._next_id = 1
+        self.failures: list[tuple[DerivedRecord, str]] = []
+
+    def _default_post(self, url: str, json: dict[str, Any]) -> Any:
+        try:
+            import httpx  # type: ignore
+        except ImportError as e:
+            raise RuntimeError(
+                "httpx not installed. `pip install kb-engine[http]` "
+                "or pass a custom `post` callable."
+            ) from e
+        return httpx.post(url, json=json, timeout=self.timeout_seconds)
+
+    def _build_envelope(self, record: DerivedRecord) -> dict[str, Any]:
+        rpc_id = self._next_id
+        self._next_id += 1
+        payload = record.payload
+        arguments: dict[str, Any] = {
+            "name": payload.get("name", ""),
+            "episode_body": payload.get("episode_body")
+                or json.dumps(payload.get("frontmatter", payload), sort_keys=True),
+            "source_description": payload.get("source_description", ""),
+            "source": payload.get("source", "json"),
+        }
+        if "group_id" in payload:
+            arguments["group_id"] = payload["group_id"]
+        return {
+            "jsonrpc": "2.0",
+            "id": rpc_id,
+            "method": "tools/call",
+            "params": {"name": self.tool_name, "arguments": arguments},
+        }
+
+    def write(self, records: Iterable[DerivedRecord]) -> int:
+        post = self._post or self._default_post
+        n = 0
+        for r in records:
+            if r.target != "graphiti":
+                continue
+            envelope = self._build_envelope(r)
+            try:
+                response = post(self.url, json=envelope)
+            except Exception as e:
+                self.failures.append((r, str(e)))
+                if self.strict:
+                    raise
+                continue
+            status = getattr(response, "status_code", None)
+            if status is not None and status >= 400:
+                msg = f"HTTP {status}: {getattr(response, 'text', '')[:200]}"
+                self.failures.append((r, msg))
+                if self.strict:
+                    raise RuntimeError(f"Graphiti POST failed: {msg}")
+                continue
+            n += 1
+        return n
+
+
 # === Frontmatter parsing ===
 
 
