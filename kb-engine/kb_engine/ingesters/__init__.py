@@ -22,8 +22,11 @@ not using AST libraries lives in each language file's docstring.
 from __future__ import annotations
 
 from .python import PythonIngester, python_source_ingester
+from .typescript import TypescriptIngester, typescript_source_ingester
 
 __all__ = [
     "PythonIngester",
+    "TypescriptIngester",
     "python_source_ingester",
+    "typescript_source_ingester",
 ]
