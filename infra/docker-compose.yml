@@ -53,7 +53,11 @@ services:
       retries: 12
 
   graphiti-mcp:
-    image: zepai/graphiti-mcp:latest
+    # Real image used by arc PR #599's stack. The earlier docker-compose
+    # in this repo guessed `zepai/graphiti-mcp:latest` which doesn't
+    # exist on Docker Hub. Verified via `docker ps` against the running
+    # PR-599 instance (commit 4c08f93).
+    image: zepai/knowledge-graph-mcp:standalone
     container_name: chio-kb-graphiti
     depends_on:
       kb-neo4j:
