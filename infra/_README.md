@@ -12,10 +12,13 @@ infra/
 ├── postgres/
 │   └── init/
 │       └── 001-vector.sql      ← creates the pgvector extension (mirrors PR #599)
-├── neo4j/
-│   └── constraints.cypher      ← uniqueness + index constraints for Chio* labels
 └── graphiti/
     └── config.yaml             ← Graphiti MCP config; group_id = chio-repo
+
+Per-pack Neo4j constraints live in pack code (chio_pack.plugin.chio_bootstrap_constraints
+returns ConstraintSpec dataclasses); the engine's IngestPipeline.bootstrap()
+collects every loaded pack's specs and applies them idempotently. There is
+no longer a static infra/neo4j/constraints.cypher.
 ```
 
 ## Services

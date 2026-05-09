@@ -94,8 +94,14 @@ class Neo4jStore:
         return cls(driver, database=database)
 
     def apply_constraints(self, cypher_statements: Sequence[str]) -> None:
-        """Apply uniqueness/index constraints. Statements are passed in by
-        the schema pack (chio-pack ships infra/neo4j/constraints.cypher).
+        """Apply raw uniqueness/index constraints. Legacy entry point
+        retained for back-compat callers that hand-roll Cypher.
+
+        The supported Phase 1+ path is `apply_constraint_specs()`, which
+        accepts ConstraintSpec dataclasses produced by each pack's
+        `bootstrap_constraints()` provider. The pipeline calls that path
+        at startup; callers should not need this raw method.
+
         Each statement runs in its own transaction; failures of
         individual statements (e.g., 'constraint already exists' on
         re-runs without IF NOT EXISTS) are swallowed in this method —
