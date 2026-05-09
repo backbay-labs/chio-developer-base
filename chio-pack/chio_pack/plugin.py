@@ -33,6 +33,7 @@ from kb_engine import (
 )
 
 from . import schema
+from .tools import ALL_TOOLS
 
 
 # === SourceIngester ===
@@ -101,16 +102,45 @@ def chio_graph_projector(parsed: ParsedFile) -> list[Node | Edge]:
 
 
 def chio_tool_registrar(server: object) -> None:
-    """Phase 1.3+: register kb_search_code, kb_search_docs, kb_neighbors,
-    kb_context, kb_impact, kb_brief_feature, kb_eval, kb_add_episode,
-    kb_find_tests, kb_find_docs on the MCP server framework.
+    """Register the 10 ``kb_*`` MCP tools on the gateway server.
 
-    Today stub — the MCP server framework is Phase 1.3+. Stub keeps the
-    registration call from erroring at boot so the rest of the pipeline
-    can be tested end-to-end.
+    The 10 tools (per AGENTS.md "The 10 MCP tools") are owned by
+    chio-pack and live as one module each under
+    :mod:`chio_pack.tools`. Each module exposes ``NAME``,
+    ``DESCRIPTION``, ``INPUT_SCHEMA``, and a ``call(arguments)`` function.
+
+    ``server`` is duck-typed: any object with a callable
+    ``register_tool(name, description, input_schema, call)`` attribute
+    satisfies the contract. The Phase 1.3+ MCP-server-framework handle
+    will satisfy it; tests use
+    :class:`chio_pack.tools.fake_server.FakeServer`.
+
+    Tool implementations are thin shims that return
+    ``{"status": "stub", "reason": "Phase 1.3+", ...}`` until their
+    underlying retrieval paths are wired (Phase 1.3+, see PLAN.md). The
+    plugin contract — *registration mechanism* — is what's load-bearing
+    here. Swapping a stub for a real query is one-line work inside the
+    relevant tool module once pgvector + Neo4j + the chunker are wired.
+
+    Raises:
+        TypeError: if ``server`` does not expose a callable
+            ``register_tool``. The error is intentional — failing fast at
+            registrar time beats silently dropping tools.
     """
-    # Future: server.register_tool("kb_search_code", ...)
-    pass
+    register = getattr(server, "register_tool", None)
+    if not callable(register):
+        raise TypeError(
+            f"server {type(server).__name__} does not expose a callable "
+            "register_tool(name, description, input_schema, call); "
+            "see chio_pack.tools.fake_server.FakeServer for the protocol."
+        )
+    for tool in ALL_TOOLS:
+        register(
+            tool.NAME,
+            tool.DESCRIPTION,
+            tool.INPUT_SCHEMA,
+            tool.call,
+        )
 
 
 # === FrontmatterHandler ===
