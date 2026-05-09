@@ -507,6 +507,192 @@ def test_daemon_delete_file_skips_when_no_frontmatter_id(tmp_path):
     assert str(note) not in daemon.state.hashes
 
 
+# === Convergence under churn (M0-C.5) ===
+
+
+class _FakeGraphStore:
+    """Minimal MERGE-on-id graph stand-in. Models what Neo4j /
+    Graphiti will actually do under the daemon's record stream:
+      - write(record) MERGEs on payload["id"], replacing payload.
+      - on_record_deleted(id, _) hard-deletes the row.
+
+    Lets us assert the daemon converges to the exact end-state vault
+    truth dictates, without booting real backing stores.
+    """
+
+    def __init__(self) -> None:
+        self.nodes: dict[str, dict[str, Any]] = {}
+        self.events: list[tuple[str, str]] = []  # (op, id) for trace
+
+    def write(self, records):
+        n = 0
+        for r in records:
+            nid = r.payload.get("id")
+            if not nid:
+                continue
+            self.nodes[nid] = dict(r.payload)
+            self.events.append(("upsert", nid))
+            n += 1
+        return n
+
+    def on_record_deleted(self, node_id: str, source_path: Path) -> None:
+        self.nodes.pop(node_id, None)
+        self.events.append(("delete", node_id))
+
+
+def _build_handler_with_content_capture():
+    """Like _build_registry_with_handler but the spec handler also
+    surfaces a `content_hint` derived from the frontmatter, so we can
+    assert which version of the file the final node holds."""
+    from kb_engine import Registry
+
+    r = Registry()
+
+    def spec_handler(type, fm):
+        yield DerivedRecord(
+            target="neo4j",
+            payload={
+                "id": fm.get("id"),
+                "type": type,
+                "version": fm.get("version"),
+            },
+        )
+
+    r.register_frontmatter_handler("spec", spec_handler)
+    return r
+
+
+def test_convergence_under_rapid_churn(tmp_path):
+    """Stress: 10 rapid create / modify / rename / delete events
+    against the same logical file. SyncState and the (fake) graph
+    must converge to exactly the truth the vault expresses at the end.
+
+    Failure mode the original code silently exhibited: no on_deleted
+    handler meant a delete-then-recreate cycle left the prior node id
+    in the graph forever, while only the most recent file was tracked
+    in state. The new daemon converges because every transition
+    (delete, rename-with-new-id, recreate) routes through the
+    Router's lifecycle methods.
+    """
+    from kb_engine import Registry
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    registry = _build_handler_with_content_capture()
+    store = _FakeGraphStore()
+    tomb_dir = tmp_path / "tomb"
+    daemon = VaultSyncDaemon(
+        registry, [store],
+        state_path=tmp_path / "state.json",
+        tombstone_writer=TombstoneAuditWriter(
+            tomb_dir,
+            clock=_fixed_clock("2026-05-08T12:00:00+00:00"),
+        ),
+    )
+
+    a = vault / "a.md"
+    b = vault / "b.md"
+    c = vault / "c.md"
+    d = vault / "d.md"
+    e = vault / "e.md"
+
+    # Event 1: create a (id=spec.x v1)
+    a.write_text("---\ntype: spec\nid: spec.x\nversion: 1\n---\n")
+    daemon.process_file(a)
+
+    # Event 2: modify a (v2)
+    a.write_text("---\ntype: spec\nid: spec.x\nversion: 2\n---\n")
+    daemon.process_file(a)
+
+    # Event 3: rename a → b, id preserved
+    a.rename(b)
+    daemon.move_file(a, b)
+
+    # Event 4: modify b (v3)
+    b.write_text("---\ntype: spec\nid: spec.x\nversion: 3\n---\n")
+    daemon.process_file(b)
+
+    # Event 5: delete b
+    b.unlink()
+    daemon.delete_file(b)
+
+    # Event 6: create c — fresh spec.x (v4)
+    c.write_text("---\ntype: spec\nid: spec.x\nversion: 4\n---\n")
+    daemon.process_file(c)
+
+    # Event 7: rename c → d with id change spec.x → spec.y
+    d.write_text("---\ntype: spec\nid: spec.y\nversion: 1\n---\n")
+    c.unlink()
+    daemon.move_file(c, d)
+
+    # Event 8: delete d
+    d.unlink()
+    daemon.delete_file(d)
+
+    # Event 9: create e — spec.x again (v5)
+    e.write_text("---\ntype: spec\nid: spec.x\nversion: 5\n---\n")
+    daemon.process_file(e)
+
+    # Event 10: modify e (v6) — final state
+    e.write_text("---\ntype: spec\nid: spec.x\nversion: 6\n---\n")
+    daemon.process_file(e)
+
+    # Final state: vault has exactly one note (e). The graph must
+    # reflect that — spec.x exists at v6, spec.y is gone. (version
+    # string-vs-int depends on whether yaml or the fallback parser is
+    # active; either way the LAST write wins.)
+    assert set(store.nodes.keys()) == {"spec.x"}
+    assert str(store.nodes["spec.x"]["version"]) == "6"
+    assert "spec.y" not in store.nodes
+
+    # State holds exactly one entry, pointing at e.
+    tracked = list(daemon.state.hashes.keys())
+    assert tracked == [str(e)]
+    assert daemon.state.meta[str(e)]["id"] == "spec.x"
+
+    # The trace should include the spec.y delete (event 8) and at
+    # least one spec.x delete (event 5). spec.x was recreated after
+    # being deleted, so the final upsert reaches the store.
+    deletes = [(op, nid) for op, nid in store.events if op == "delete"]
+    delete_ids = [nid for _, nid in deletes]
+    assert "spec.x" in delete_ids
+    assert "spec.y" in delete_ids
+    # Final spec.x event is an upsert, not a delete (proves
+    # convergence to the recreated state, not orphaned mid-churn).
+    assert store.events[-1] == ("upsert", "spec.x")
+
+
+def test_convergence_run_once_after_churn_is_idempotent(tmp_path):
+    """After a churn sequence ending in a stable file, a follow-up
+    run_once must not re-emit any deletes or upserts. Catches the bug
+    where post-rename state holds a stale path and prune fires a
+    spurious delete.
+    """
+    vault = tmp_path / "vault"
+    vault.mkdir()
+
+    registry = _build_handler_with_content_capture()
+    store = _FakeGraphStore()
+    daemon = VaultSyncDaemon(registry, [store], state_path=tmp_path / "state.json")
+
+    a = vault / "a.md"
+    b = vault / "b.md"
+    a.write_text("---\ntype: spec\nid: spec.x\nversion: 1\n---\n")
+    daemon.process_file(a)
+    a.rename(b)
+    daemon.move_file(a, b)
+    daemon.state.save()
+
+    n_before = len(store.events)
+    stats = daemon.run_once(vault)
+    assert stats.files_pruned == 0  # the state was migrated by move_file
+    n_after = len(store.events)
+    # No new deletes; b was unchanged so no new upsert either
+    assert n_after == n_before
+    assert set(store.nodes.keys()) == {"spec.x"}
+
+
 # === Tombstone audit writer (M0-C.4) ===
 
 
