@@ -1,4 +1,4 @@
-"""pgvector backing store. Stores code/doc chunks with embeddings.
+"""pgvector backing store. Stores code chunks with embeddings.
 
 Schema (created by `bootstrap()`):
 
@@ -19,8 +19,14 @@ Schema (created by `bootstrap()`):
     CREATE INDEX ... USING ivfflat (embedding vector_cosine_ops);
     CREATE INDEX ... (file_path);
 
-    chio_kb.doc_chunks: same shape, with `doc_type`, `title`, `section`
-    instead of language/line columns. (Phase 1.3+ — schema-only stub today.)
+NOTE on doc_chunks: the doc_chunks table is not yet created; doc
+indexing lands in Phase 1.x — see PLAN.md (M1 / T1.4 generic text
+ingesters). The previous "schema-only stub today" comment described
+a table that no `bootstrap()` call ever created and no insert path
+ever populated — a phantom schema that the Skeptic's M0 audit
+flagged as a silent-zero hazard. If a code path needs doc-chunk
+storage before Phase 1.x lands, see `_doc_chunks_not_implemented`
+below for the canonical fail-loud path.
 
 The store is connection-injected: tests pass a Mock; production
 constructs via from_url(). Statements use parameterized queries
@@ -32,6 +38,19 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from typing import Any, Sequence
+
+
+def _doc_chunks_not_implemented() -> None:
+    """Fail-loud anchor for any future code path that needs doc-chunk
+    storage before Phase 1.x lands. The previous design referenced a
+    phantom `chio_kb.doc_chunks` table that was never created — a
+    silent-zero hazard. Until M1 / T1.4 wires generic text ingesters
+    and a real `doc_chunks` schema, callers must raise rather than
+    no-op.
+    """
+    raise NotImplementedError(
+        "doc_chunks table not yet bootstrapped — see PLAN.md Phase 1.x"
+    )
 
 
 @dataclass
