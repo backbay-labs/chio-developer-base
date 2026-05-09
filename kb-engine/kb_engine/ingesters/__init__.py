@@ -21,12 +21,15 @@ not using AST libraries lives in each language file's docstring.
 """
 from __future__ import annotations
 
+from .markdown import MarkdownIngester, markdown_source_ingester
 from .python import PythonIngester, python_source_ingester
 from .typescript import TypescriptIngester, typescript_source_ingester
 
 __all__ = [
+    "MarkdownIngester",
     "PythonIngester",
     "TypescriptIngester",
+    "markdown_source_ingester",
     "python_source_ingester",
     "typescript_source_ingester",
 ]
