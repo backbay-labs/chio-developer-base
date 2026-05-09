@@ -331,6 +331,26 @@ class SyncState:
         self.hashes.pop(path_str, None)
         return self.meta.pop(path_str, {})
 
+    def prune(self) -> list[tuple[str, dict[str, Any]]]:
+        """Drop entries whose source file no longer exists.
+
+        Returns the list of dropped `(path_str, meta_dict)` pairs so
+        callers can re-emit deletion records for files removed while
+        the daemon was offline.
+
+        Pure state operation — does NOT touch routers / stores. The
+        daemon wraps this with `prune_state()` to fire deletion
+        records.
+        """
+        dropped: list[tuple[str, dict[str, Any]]] = []
+        for path_str in list(self.hashes.keys()):
+            if Path(path_str).exists():
+                continue
+            meta = self.meta.pop(path_str, {})
+            self.hashes.pop(path_str, None)
+            dropped.append((path_str, meta))
+        return dropped
+
 
 @dataclass
 class SyncStats:
@@ -340,6 +360,7 @@ class SyncStats:
     files_skipped_no_frontmatter: int = 0
     records_routed: int = 0
     files_deleted: int = 0
+    files_pruned: int = 0
 
 
 # === Daemon ===
@@ -363,6 +384,31 @@ class VaultSyncDaemon:
         if state_path is None:
             state_path = Path.home() / ".chio-dev" / "vault-sync.state.json"
         self.state = SyncState.load(state_path)
+
+    def prune_state(self) -> list[tuple[str, str | None]]:
+        """Detect and propagate deletions that happened while the
+        daemon was offline.
+
+        Walks SyncState; for each tracked path whose file no longer
+        exists, drops it from state AND emits an `on_record_deleted`
+        record to every Router (when we know the node_id).
+
+        Returns the list of `(path_str, node_id_or_None)` pruned
+        entries. Used by `run_once` (polling mode) and on daemon
+        startup before the watchdog wires up — covers the gap where a
+        delete happened with no daemon process running.
+        """
+        dropped = self.state.prune()
+        emitted: list[tuple[str, str | None]] = []
+        for path_str, meta in dropped:
+            node_id = meta.get("id")
+            if node_id:
+                for router in self.routers:
+                    router.on_record_deleted(str(node_id), Path(path_str))
+                emitted.append((path_str, str(node_id)))
+            else:
+                emitted.append((path_str, None))
+        return emitted
 
     def process_file(self, path: Path) -> tuple[int, str]:
         """Process a single vault file. Returns (records_routed, status).
@@ -528,8 +574,16 @@ class VaultSyncDaemon:
         return True, node_id
 
     def run_once(self, vault_root: Path, *, glob: str = "**/*.md") -> SyncStats:
-        """One-shot scan of vault_root. Returns aggregate stats and persists state."""
+        """One-shot scan of vault_root. Returns aggregate stats and persists state.
+
+        Prunes stale state entries first — files that were tracked but
+        no longer exist (e.g., deleted while the daemon was off, or
+        between polling ticks). Pruned entries fire deletion records to
+        every Router so derived stores converge on vault truth.
+        """
         stats = SyncStats()
+        pruned = self.prune_state()
+        stats.files_pruned = len(pruned)
         for path in sorted(vault_root.glob(glob)):
             if not path.is_file():
                 continue
@@ -555,9 +609,17 @@ class VaultSyncDaemon:
         """Long-running watcher. Uses watchdog if available, falls back
         to polling.
 
+        Catches up on offline deletions by running `prune_state()` once
+        before the watchdog observer wires up — without this the
+        daemon would silently miss any delete that happened while it
+        was off.
+
         watchdog_handler lets tests inject a custom callback (e.g., to
         capture events without a real filesystem watcher).
         """
+        # Catch up on offline deletions before live event handling.
+        self.prune_state()
+        self.state.save()
         try:
             from watchdog.observers import Observer  # type: ignore
             from watchdog.events import FileSystemEventHandler  # type: ignore
