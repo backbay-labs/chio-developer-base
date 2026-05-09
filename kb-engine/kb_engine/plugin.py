@@ -105,12 +105,43 @@ class Registry:
        `register_*()` methods to add hooks programmatically.
 
     Both modes coexist; entry-point hooks merge with direct ones.
+
+    Builtin source ingesters
+    ------------------------
+
+    On construction, the Registry seeds the kb-engine builtin source
+    ingesters (`.py`, `.ts`/`.tsx`/`.js`/`.jsx`/`.mts`/`.cts`, `.md`/
+    `.markdown`/`.mdx`) into a separate `_builtin_source_ingesters`
+    list. Pack-registered ingesters live in `source_ingesters` and are
+    checked FIRST. The precedence rule is therefore explicit:
+
+        pack ingesters > builtin ingesters
+
+    A pack registering a Python tree-sitter ingester via
+    `registry.register_source_ingester(...)` shadows the builtin
+    Python chunker — the pack's hook returns first when the engine
+    calls `ingest_file()`. Builtins remain available as a fallback
+    for extensions the pack does not handle.
+
+    To suppress the builtins entirely (e.g., a test that wants only its
+    own ingesters), pass `seed_builtins=False` to `__init__` or call
+    `clear_builtin_ingesters()`.
     """
 
     source_ingesters: list[SourceIngester] = field(default_factory=list)
     graph_projectors: list[GraphProjector] = field(default_factory=list)
     tool_registrars: list[ToolRegistrar] = field(default_factory=list)
     frontmatter_handlers: dict[str, list[FrontmatterHandler]] = field(default_factory=dict)
+    # Internal: builtin ingesters seeded on construction. Checked AFTER
+    # pack/user-registered hooks so pack > builtin precedence is explicit.
+    _builtin_source_ingesters: list[SourceIngester] = field(default_factory=list)
+    # Construction-time toggle for seeding builtins. False is for tests
+    # that want a strictly empty registry.
+    seed_builtins: bool = True
+
+    def __post_init__(self) -> None:
+        if self.seed_builtins and not self._builtin_source_ingesters:
+            self.register_builtin_ingesters()
 
     # === Direct registration ===
 
@@ -118,6 +149,38 @@ class Registry:
         if not isinstance(hook, SourceIngester) and not callable(hook):
             raise TypeError(f"hook {hook!r} is not callable / not a SourceIngester")
         self.source_ingesters.append(hook)
+
+    def register_builtin_ingesters(self) -> None:
+        """Seed the kb-engine built-in source ingesters.
+
+        Registers `.py`, `.ts`/`.tsx`/`.js`/`.jsx`/`.mts`/`.cts`, and
+        `.md`/`.markdown`/`.mdx` chunkers from `kb_engine.ingesters`.
+        Idempotent — calling twice does not double-register.
+
+        Builtins go on `_builtin_source_ingesters` (not the public
+        `source_ingesters` list), so any pack-registered hook for the
+        same extension takes precedence at dispatch time.
+
+        Imported lazily inside the function to avoid a circular import
+        at module load (kb_engine.ingesters depends on kb_engine.types
+        and indirectly on this module via the SourceIngester protocol).
+        """
+        if self._builtin_source_ingesters:
+            return
+        from .ingesters import (  # noqa: PLC0415 — see docstring
+            MarkdownIngester,
+            PythonIngester,
+            TypescriptIngester,
+        )
+        self._builtin_source_ingesters.extend([
+            PythonIngester(),
+            TypescriptIngester(),
+            MarkdownIngester(),
+        ])
+
+    def clear_builtin_ingesters(self) -> None:
+        """Remove all seeded builtins. Use in tests for a clean slate."""
+        self._builtin_source_ingesters.clear()
 
     def register_graph_projector(self, hook: GraphProjector) -> None:
         if not isinstance(hook, GraphProjector) and not callable(hook):
@@ -164,8 +227,17 @@ class Registry:
     # === Dispatch ===
 
     def ingest_file(self, file_path: str) -> ParsedFile | None:
-        """Run source ingesters in registration order; first non-None wins."""
+        """Run source ingesters; first non-None wins.
+
+        Order: pack/user-registered hooks (`source_ingesters`) FIRST,
+        then the kb-engine builtins (`_builtin_source_ingesters`). This
+        encodes the documented precedence rule: pack > builtin.
+        """
         for ingester in self.source_ingesters:
+            result = ingester(file_path)
+            if result is not None:
+                return result
+        for ingester in self._builtin_source_ingesters:
             result = ingester(file_path)
             if result is not None:
                 return result
