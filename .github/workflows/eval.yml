@@ -115,3 +115,60 @@ jobs:
                 body: tagged,
               });
             }
+
+  fresh-clone-smoke:
+    # M0-D.5 — catch path-dependent breakage before claiming
+    # "fresh-clone-to-working ≤ 10 min" (PLAN.md Phase 1.5 acceptance
+    # criterion). Verifies the repo can be cloned to an arbitrary
+    # absolute path and the unit tests + status target still work
+    # without any assumptions about the original checkout location.
+    name: Fresh-clone smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Need full git history because the smoke test re-clones
+          # via `git clone .` — a shallow checkout would refuse to
+          # clone with the default protocol.
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+
+      - name: Clone the workspace into /tmp/clone
+        # `git clone .` validates that the repo's tracked content is
+        # actually committed (no untracked-only fixtures, no relative
+        # paths that escape the repo root). The clone target is an
+        # absolute path far from the original to surface any
+        # ${{ github.workspace }}-baked assumptions.
+        run: git clone "$(pwd)" /tmp/clone
+
+      - name: kb-status from the clone
+        # `make kb-status` is a Phase-0 self-report. Running it from
+        # the clone proves the Makefile and ops/scripts work without
+        # the original checkout dir.
+        working-directory: /tmp/clone
+        run: make kb-status
+
+      - name: Unit tests from the clone
+        # The two unit-test suites that gate every PR. Running them
+        # from /tmp/clone catches anything that hard-codes the
+        # original repo path (e.g., importable test fixtures, test-
+        # discovery rooted at $CWD/..).
+        working-directory: /tmp/clone
+        run: |
+          cd kb-engine && uv sync --group dev && uv run python -m pytest tests/ -q
+          cd ../chio-pack && uv sync --group dev && uv run python -m pytest tests/ -q
+
+      - name: Engine ↔ pack boundary check from the clone
+        # The boundary script computes the repo root from its own
+        # __file__. Running from /tmp/clone confirms the relative-
+        # path math is location-independent.
+        working-directory: /tmp/clone
+        run: python3 ops/ci/check-imports.py
