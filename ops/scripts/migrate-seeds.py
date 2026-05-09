@@ -29,10 +29,18 @@ from pathlib import Path
 from typing import Any
 
 # Body subkeys that should appear as TYPED LISTS in frontmatter (not body sections).
+#
+# All keys are stored snake_case to match the convention used by the existing
+# vault notes (see vault/episodes/*.md, vault/_meta/templates/episode.md, and
+# the chio-frontmatter.css selectors that target snake_case property keys).
 KNOWN_TYPED_LIST_FIELDS = {
     "authoritative_files",
     "tests",
     "validation",
+    # Per-episode allow-list of MCP tools an agent should reach for first.
+    # Added M0-D.3 to stop dumping the field as raw JSON in the body when a
+    # seed (e.g. agent-workflow-constraints.json) ships it.
+    "preferred_tools",
 }
 
 # Body subkeys that become markdown ## sections in the rendered note.
