@@ -41,6 +41,7 @@ relevant `kb_engine.store.*` adapters or HTTP clients.
 """
 from __future__ import annotations
 
+import datetime as _dt
 import hashlib
 import json
 import os
@@ -275,6 +276,67 @@ def _content_hash(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+# === Tombstone audit ===
+
+
+class TombstoneAuditWriter:
+    """Append-only audit log of every vault note deletion.
+
+    Per M0-C.4: derived stores hard-delete (Neo4jStore.delete_node) so
+    they stay aligned with vault truth. To keep deletions observable,
+    auditable, and reversible, the daemon writes a tombstone line to
+    `vault/_meta/tombstones/YYYY-MM-DD.jsonl` for every removed note.
+
+    Schema per line (JSONL):
+      {"id":              <frontmatter id>,
+       "deleted_at":      ISO-8601 UTC timestamp,
+       "source_path":     absolute path of the deleted note,
+       "last_known_hash": last-seen sha256 from SyncState (or null),
+       "reason":          "watchdog_delete" | "watchdog_rename" |
+                          "offline_prune"}
+
+    The writer is intentionally tiny: rotation is by-day via the file
+    name; ops can ship the dir to cold storage. Restoring an episode
+    means re-creating the vault note (the sync daemon then re-derives
+    on the next pass).
+    """
+
+    def __init__(self, dir_path: Path, *, clock: Callable[[], _dt.datetime] | None = None) -> None:
+        self.dir_path = dir_path
+        self._clock = clock or (lambda: _dt.datetime.now(_dt.timezone.utc))
+        self.dir_path.mkdir(parents=True, exist_ok=True)
+
+    def _path_for(self, when: _dt.datetime) -> Path:
+        return self.dir_path / f"{when.date().isoformat()}.jsonl"
+
+    def write(
+        self,
+        node_id: str | None,
+        source_path: Path,
+        *,
+        last_known_hash: str | None = None,
+        reason: str = "watchdog_delete",
+    ) -> Path:
+        """Append a tombstone line. Returns the file written to.
+
+        The clock is consulted exactly once per write — same instant
+        used for both the timestamp field and the rotated file name.
+        """
+        now = self._clock()
+        record = {
+            "id": node_id,
+            "deleted_at": now.isoformat(),
+            "source_path": str(source_path),
+            "last_known_hash": last_known_hash,
+            "reason": reason,
+        }
+        path = self._path_for(now)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a") as f:
+            f.write(json.dumps(record, sort_keys=True) + "\n")
+        return path
+
+
 # === Daemon state ===
 
 
@@ -378,30 +440,65 @@ class VaultSyncDaemon:
         registry: Registry,
         routers: list[Router],
         state_path: Path | None = None,
+        tombstone_writer: "TombstoneAuditWriter | None" = None,
     ) -> None:
         self.registry = registry
         self.routers = routers
         if state_path is None:
             state_path = Path.home() / ".chio-dev" / "vault-sync.state.json"
         self.state = SyncState.load(state_path)
+        self.tombstone_writer = tombstone_writer
+
+    def _record_tombstone(
+        self,
+        node_id: str | None,
+        source_path: Path,
+        *,
+        last_known_hash: str | None = None,
+        reason: str = "watchdog_delete",
+    ) -> None:
+        if self.tombstone_writer is None:
+            return
+        self.tombstone_writer.write(
+            node_id,
+            source_path,
+            last_known_hash=last_known_hash,
+            reason=reason,
+        )
 
     def prune_state(self) -> list[tuple[str, str | None]]:
         """Detect and propagate deletions that happened while the
         daemon was offline.
 
         Walks SyncState; for each tracked path whose file no longer
-        exists, drops it from state AND emits an `on_record_deleted`
-        record to every Router (when we know the node_id).
+        exists, drops it from state AND:
+
+          - emits an `on_record_deleted` record to every Router (when
+            we know the node_id), and
+          - writes a tombstone audit line (reason="offline_prune") for
+            forensics — even no-id entries get a tombstone so ops can
+            tell the daemon detected the delete.
 
         Returns the list of `(path_str, node_id_or_None)` pruned
         entries. Used by `run_once` (polling mode) and on daemon
         startup before the watchdog wires up — covers the gap where a
         delete happened with no daemon process running.
         """
+        # Capture last-known hashes BEFORE prune mutates state.
+        last_hashes = {
+            p: self.state.hashes.get(p)
+            for p in list(self.state.hashes.keys())
+        }
         dropped = self.state.prune()
         emitted: list[tuple[str, str | None]] = []
         for path_str, meta in dropped:
             node_id = meta.get("id")
+            self._record_tombstone(
+                str(node_id) if node_id else None,
+                Path(path_str),
+                last_known_hash=last_hashes.get(path_str),
+                reason="offline_prune",
+            )
             if node_id:
                 for router in self.routers:
                     router.on_record_deleted(str(node_id), Path(path_str))
@@ -497,13 +594,13 @@ class VaultSyncDaemon:
         # If dest doesn't exist or is unreadable, treat as a deletion
         # of src — the rename event lied about the destination.
         if not dest.is_file():
-            self.delete_file(src)
+            self.delete_file(src, reason="watchdog_rename")
             return "delete_only", old_id, None
 
         try:
             text = dest.read_text(encoding="utf-8")
         except OSError:
-            self.delete_file(src)
+            self.delete_file(src, reason="watchdog_rename")
             return "delete_only", old_id, None
 
         frontmatter, _ = _parse_frontmatter(text)
@@ -522,7 +619,7 @@ class VaultSyncDaemon:
         # delete propagates to the Router so the old node is removed
         # from derived stores; process_file then re-derives the new id.
         if old_id is not None and new_id is not None:
-            self.delete_file(src)
+            self.delete_file(src, reason="watchdog_rename")
             self.process_file(dest)
             return "renamed_new_id", str(old_id), str(new_id)
 
@@ -537,7 +634,7 @@ class VaultSyncDaemon:
 
         # Case 4: src tracked, dest has no id — treat as delete of src.
         if old_id is not None and new_id is None:
-            self.delete_file(src)
+            self.delete_file(src, reason="watchdog_rename")
             # Still update state for dest so we don't re-derive on next
             # poll if frontmatter is missing.
             self.process_file(dest)
@@ -548,13 +645,23 @@ class VaultSyncDaemon:
         self.process_file(dest)
         return "noop", None, None
 
-    def delete_file(self, path: Path) -> tuple[bool, str | None]:
+    def delete_file(
+        self,
+        path: Path,
+        *,
+        reason: str = "watchdog_delete",
+    ) -> tuple[bool, str | None]:
         """Handle deletion of a vault file. Returns (emitted, node_id).
 
         Looks up the file's last-known frontmatter `id` from SyncState;
         if found, calls `Router.on_record_deleted(node_id, path)` on
-        every configured router. State is pruned regardless so
-        re-creation of the file later re-processes it from scratch.
+        every configured router. A tombstone audit line is written
+        regardless (even for untracked files — a delete event is
+        observable signal even when there's no graph node to drop) so
+        ops can audit the full vault deletion stream.
+
+        State is pruned regardless so re-creation of the file later
+        re-processes it from scratch.
 
         Returns:
           - emitted: True if a deletion record was actually emitted
@@ -565,8 +672,15 @@ class VaultSyncDaemon:
           - node_id: The id we emitted, or None if untracked.
         """
         rel = str(path)
+        last_known_hash = self.state.hashes.get(rel)
         meta = self.state.forget(rel)
         node_id = meta.get("id")
+        self._record_tombstone(
+            str(node_id) if node_id else None,
+            path,
+            last_known_hash=last_known_hash,
+            reason=reason,
+        )
         if not node_id:
             return False, None
         for router in self.routers:

@@ -50,6 +50,22 @@ The baselines for the four Phase 0 outcome evals, measured against the unmodifie
 - **`conformance-harness-recall`:** [TBD — note the `--search-limit` value used by `harvest-conformance-fixtures.py` and how many fixtures were dropped at the `confidence=low` cut]
 - **`capability-error-explanation`:** [TBD — name the three raters; record any rubric calibration adjustments from the inter-rater session]
 
+### M0 (Harden v0.1) — Phase 0 outcome-eval correctness debt (2026-05-08)
+
+The Skeptic's audit on the M0 milestone surfaced three silent-failure paths in the Phase 0 outcome-eval runners. They are not bugs in the rubric or the spec — they are gaps between what the runners *measure* and what the rubric *defines*. Each is now visible in the runner's JSON output (so a downstream consumer cannot quietly accept the placeholder values as a real signal) and is recorded here so that the eventual baseline numbers can be interpreted correctly.
+
+When the corresponding silent-failure path is closed, the JSON-output surface (e.g. `stub_warning`, `stubbed_kinds`, `llm_independence_warning`) falls off automatically; this section can then be amended with a successor delta noting the date the gap closed.
+
+- **`repeated-mistake-rate` — candidate-notes stub.** The runner's `_candidate_notes_stub(pre_context)` returns `[]`. The real implementation must call `kb_search_code` / `kb_search_docs` against a snapshot of the KB index AT THE TIME of the mistake (Phase 1 deliverable). Until that lands, the LLM-judge has no candidate notes to consider, defaults to `was_documented = False`, and the metric is biased toward 0%. The runner now emits a `stub_warning` field listing this gap so the JSON output can never be silently mistaken for a real measurement. See `chio_pack/eval/runners/repeated_mistake.py::_candidate_notes_stub`. Sunset: when the Phase 1 KB stack is wired into the candidate-recovery path, remove the `_is_stub` markers and the warning falls off automatically.
+
+- **`repeated-mistake-rate` — three stubbed mistake-kind classifiers.** `superseded_quickly`, `wrong_capability_scope`, and `bypassed_guard` always return `[]` from `chio_pack/eval/classifiers/heuristic.py`. They require, respectively, the vault-sync ADR-transition log and arc-aware static analysis of capability literals / guard call sites — all Phase 1+ work. The runner now emits a `stubbed_kinds` field naming these three so the metric's per-kind breakdown is honestly under-counted. Successor work should remove the relevant entries from `_STUBBED_KIND_INFO` in the same change that lands the real implementation.
+
+- **`capability-error-explanation` — rater-B and rater-C are same Anthropic family.** Per [ADR-0004](ADR-0004-rater-pool.md), rater-B is `claude-sonnet-4-6` and rater-C is `claude-haiku-4-5-20251001`. Both are within the Anthropic family; cross-family diversity is absent. Inter-rater agreement statistics from the Run-0 calibration are therefore expected to be **optimistic** — the LLM raters share blind spots and tend to agree more than two genuinely independent raters would. The calibration harness now (a) resolves the model names from the `CHIO_KB_RATER_B_MODEL` and `CHIO_KB_RATER_C_MODEL` env vars (so an operator can pin a snapshot or substitute a non-Anthropic model without editing source) and (b) emits an `llm_independence_warning` whenever the rater-B/rater-C disagreement-flag rate falls below 5% on a calibration run, with a reference to the ADR-0004a sunset criterion (12 weeks from 2026-05-07; recruit a non-Anthropic rater or re-affirm the choice with cost data). Treat the disagreement-flag rate as a lower bound until cross-family raters are added.
+
+These deltas do not change the *spec* in PHASE-0.md or invalidate the Run-0 calibration. They make the existing methodology gaps machine-readable so that:
+- the eventual baseline numbers in the table above are interpreted correctly when they land, and
+- a green CI run cannot quietly mask the structural under-counting until Phase 1 closes the gaps.
+
 ## Fixture provenance
 
 > Filled in when fixtures are committed. Each commit-SHA pin makes the baseline reproducible.

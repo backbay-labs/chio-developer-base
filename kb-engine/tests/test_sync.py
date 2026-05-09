@@ -11,6 +11,7 @@ from kb_engine.sync import (
     JsonlRouter,
     NullRouter,
     SyncState,
+    TombstoneAuditWriter,
     VaultSyncDaemon,
     _content_hash,
     _parse_frontmatter,
@@ -504,6 +505,186 @@ def test_daemon_delete_file_skips_when_no_frontmatter_id(tmp_path):
     assert node_id is None
     assert router.deleted == []
     assert str(note) not in daemon.state.hashes
+
+
+# === Tombstone audit writer (M0-C.4) ===
+
+
+def _fixed_clock(when: str):
+    import datetime as _dt
+    dt = _dt.datetime.fromisoformat(when)
+    return lambda: dt
+
+
+def test_tombstone_writer_writes_jsonl_line(tmp_path):
+    writer = TombstoneAuditWriter(
+        tmp_path / "tomb",
+        clock=_fixed_clock("2026-05-08T12:00:00+00:00"),
+    )
+    out = writer.write(
+        "spec.x",
+        pathlib.Path("/v/spec/x.md"),
+        last_known_hash="sha256:abc",
+        reason="watchdog_delete",
+    )
+    assert out.name == "2026-05-08.jsonl"
+    import json as _json
+    line = _json.loads(out.read_text().strip())
+    assert line == {
+        "id": "spec.x",
+        "deleted_at": "2026-05-08T12:00:00+00:00",
+        "source_path": "/v/spec/x.md",
+        "last_known_hash": "sha256:abc",
+        "reason": "watchdog_delete",
+    }
+
+
+def test_tombstone_writer_appends_not_overwrites(tmp_path):
+    writer = TombstoneAuditWriter(
+        tmp_path / "tomb",
+        clock=_fixed_clock("2026-05-08T12:00:00+00:00"),
+    )
+    writer.write("a", pathlib.Path("/a.md"))
+    writer.write("b", pathlib.Path("/b.md"))
+    writer.write("c", pathlib.Path("/c.md"))
+    file = tmp_path / "tomb" / "2026-05-08.jsonl"
+    lines = file.read_text().strip().splitlines()
+    assert len(lines) == 3
+    import json as _json
+    ids = [_json.loads(l)["id"] for l in lines]
+    assert ids == ["a", "b", "c"]
+
+
+def test_tombstone_writer_rotates_by_day(tmp_path):
+    """Two deletions on different days land in different files."""
+    import datetime as _dt
+    times = iter([
+        _dt.datetime(2026, 5, 8, 23, 59, tzinfo=_dt.timezone.utc),
+        _dt.datetime(2026, 5, 9, 0, 1, tzinfo=_dt.timezone.utc),
+    ])
+    writer = TombstoneAuditWriter(tmp_path / "tomb", clock=lambda: next(times))
+    writer.write("a", pathlib.Path("/a.md"))
+    writer.write("b", pathlib.Path("/b.md"))
+    files = sorted((tmp_path / "tomb").glob("*.jsonl"))
+    names = [f.name for f in files]
+    assert names == ["2026-05-08.jsonl", "2026-05-09.jsonl"]
+
+
+def test_daemon_writes_tombstone_on_delete_file(tmp_path):
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    note = vault / "x.md"
+    note.write_text("---\ntype: spec\nid: spec.x\n---\nBody\n")
+
+    tomb_dir = tmp_path / "vault" / "_meta" / "tombstones"
+    writer = TombstoneAuditWriter(
+        tomb_dir,
+        clock=_fixed_clock("2026-05-08T12:00:00+00:00"),
+    )
+    registry = _build_registry_with_handler()
+    router = NullRouter()
+    daemon = VaultSyncDaemon(
+        registry, [router],
+        state_path=tmp_path / "state.json",
+        tombstone_writer=writer,
+    )
+    daemon.run_once(vault)
+    last_hash = daemon.state.hashes[str(note)]
+
+    note.unlink()
+    daemon.delete_file(note)
+
+    file = tomb_dir / "2026-05-08.jsonl"
+    import json as _json
+    line = _json.loads(file.read_text().strip().splitlines()[0])
+    assert line["id"] == "spec.x"
+    assert line["last_known_hash"] == last_hash
+    assert line["reason"] == "watchdog_delete"
+
+
+def test_daemon_writes_tombstone_for_offline_prune(tmp_path):
+    """Offline-detected deletion gets a tombstone with reason="offline_prune"
+    so ops can distinguish from live delete events.
+    """
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    note = vault / "x.md"
+    note.write_text("---\ntype: spec\nid: spec.x\n---\n")
+
+    tomb_dir = tmp_path / "tomb"
+    writer = TombstoneAuditWriter(
+        tomb_dir,
+        clock=_fixed_clock("2026-05-08T12:00:00+00:00"),
+    )
+    registry = _build_registry_with_handler()
+    router = NullRouter()
+    daemon = VaultSyncDaemon(
+        registry, [router],
+        state_path=tmp_path / "state.json",
+        tombstone_writer=writer,
+    )
+    daemon.run_once(vault)
+    note.unlink()
+    daemon.prune_state()
+
+    file = tomb_dir / "2026-05-08.jsonl"
+    import json as _json
+    line = _json.loads(file.read_text().strip().splitlines()[0])
+    assert line["reason"] == "offline_prune"
+    assert line["id"] == "spec.x"
+
+
+def test_daemon_writes_tombstone_with_rename_reason(tmp_path):
+    """A rename whose id changed (delete+create) tombstones the old id
+    with reason="watchdog_rename" so ops can correlate.
+    """
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    src = vault / "old.md"
+    src.write_text("---\ntype: spec\nid: spec.old\n---\n")
+
+    tomb_dir = tmp_path / "tomb"
+    writer = TombstoneAuditWriter(
+        tomb_dir,
+        clock=_fixed_clock("2026-05-08T12:00:00+00:00"),
+    )
+    registry = _build_registry_with_handler()
+    router = NullRouter()
+    daemon = VaultSyncDaemon(
+        registry, [router],
+        state_path=tmp_path / "state.json",
+        tombstone_writer=writer,
+    )
+    daemon.run_once(vault)
+
+    dest = vault / "new.md"
+    dest.write_text("---\ntype: spec\nid: spec.new\n---\n")
+    src.unlink()
+    daemon.move_file(src, dest)
+
+    file = tomb_dir / "2026-05-08.jsonl"
+    import json as _json
+    line = _json.loads(file.read_text().strip().splitlines()[0])
+    assert line["id"] == "spec.old"
+    assert line["reason"] == "watchdog_rename"
+
+
+def test_daemon_without_tombstone_writer_does_not_crash(tmp_path):
+    """Tombstone writer is optional. Construction without it must work
+    and `delete_file` must not error."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    note = vault / "x.md"
+    note.write_text("---\ntype: spec\nid: spec.x\n---\n")
+
+    registry = _build_registry_with_handler()
+    router = NullRouter()
+    daemon = VaultSyncDaemon(registry, [router], state_path=tmp_path / "state.json")
+    daemon.run_once(vault)
+    note.unlink()
+    emitted, node_id = daemon.delete_file(note)
+    assert emitted is True
+    assert node_id == "spec.x"
 
 
 # === SyncState.prune (M0-C.3) ===

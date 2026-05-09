@@ -175,3 +175,43 @@ def test_neo4j_reset_with_label_prefix_filters():
     cypher = session.run.call_args[0][0]
     assert "Chio" in cypher
     assert "STARTS WITH" in cypher
+
+
+def test_neo4j_delete_node_uses_detach_delete_and_id_param():
+    """delete_node must DETACH DELETE (no dangling edges) and bind the
+    id as a parameter (no Cypher injection).
+    """
+    driver, session = _mock_neo4j_driver()
+    result = MagicMock()
+    record = {"deleted": 1}
+    result.single.return_value = record
+    session.run.return_value = result
+    store = Neo4jStore(driver)
+    n = store.delete_node("spec.x")
+    assert n == 1
+    cypher, kwargs = session.run.call_args[0][0], session.run.call_args[1]
+    assert "DETACH DELETE" in cypher
+    assert "MATCH (n {id: $id})" in cypher
+    assert kwargs == {"id": "spec.x"}
+
+
+def test_neo4j_delete_node_idempotent_when_missing():
+    """Deleting a non-existent id returns 0 — re-running the prune is
+    safe."""
+    driver, session = _mock_neo4j_driver()
+    result = MagicMock()
+    result.single.return_value = {"deleted": 0}
+    session.run.return_value = result
+    store = Neo4jStore(driver)
+    assert store.delete_node("does-not-exist") == 0
+
+
+def test_neo4j_delete_node_handles_no_record():
+    """If the driver returns no record (edge case in some adapters),
+    delete_node returns 0 instead of crashing."""
+    driver, session = _mock_neo4j_driver()
+    result = MagicMock()
+    result.single.return_value = None
+    session.run.return_value = result
+    store = Neo4jStore(driver)
+    assert store.delete_node("anything") == 0

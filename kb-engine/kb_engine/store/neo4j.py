@@ -144,6 +144,35 @@ class Neo4jStore:
             result = session.run(cypher, id=node_id, depth=depth, limit=limit)
             return [dict(record) for record in result]
 
+    def delete_node(self, node_id: str) -> int:
+        """Hard-delete a single node by id (across any label).
+
+        Used by the vault-sync daemon's deletion path: vault is
+        canonical, Graphiti / Neo4j are derived, so removing a vault
+        note must remove the corresponding graph node. The
+        accompanying tombstone JSONL audit (sync.TombstoneAuditWriter)
+        keeps the deletion observable and reversible.
+
+        DETACH DELETE drops incident edges along with the node, so the
+        graph stays consistent (no dangling rels). Returns the number
+        of nodes actually deleted (0 if no such id exists — idempotent
+        re-run is safe).
+        """
+        cypher = "MATCH (n {id: $id}) DETACH DELETE n RETURN count(n) AS deleted"
+        with self.driver.session(database=self.database) as session:
+            result = session.run(cypher, id=node_id)
+            try:
+                record = result.single()
+            except Exception:
+                record = None
+            if record is None:
+                return 0
+            try:
+                # Driver result records support `record["key"]`.
+                return int(record["deleted"])
+            except (KeyError, TypeError, ValueError):
+                return 0
+
     def reset(self, label_prefix: str | None = None) -> None:
         """Delete all nodes (or all nodes whose label starts with
         `label_prefix`). Used by `make kb-reset`. Destructive.
