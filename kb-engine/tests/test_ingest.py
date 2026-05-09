@@ -165,3 +165,49 @@ def test_ingest_pipeline_works_without_neo4j(tmp_path):
     assert n_nodes == 0
     assert n_edges == 0
     assert n_chunks == 1
+
+
+def test_ingest_tree_respects_include_globs(tmp_path):
+    """ingest_tree(include_globs=...) restricts the walk to matching files.
+
+    Used by sources.toml's optional `glob = [...]` setting.
+    """
+    src = tmp_path / "repo"
+    (src / "crates").mkdir(parents=True)
+    (src / "crates" / "kept.rs").write_text("fn kept() {}\n")
+    (src / "crates" / "skipped.rs").write_text("fn skipped() {}\n")
+
+    registry = _make_registry_for_rust()
+    neo = FakeNeo4j()
+    pipeline = IngestPipeline(registry, postgres=None, neo4j=neo, embedder=None)
+    stats = pipeline.ingest_tree(src, include_globs=["crates/kept.rs"])
+    assert stats.files_ingested == 1
+    assert all("kept" in n.id for n in neo.nodes if n.label == "File")
+
+
+def test_ingest_tree_respects_exclude_globs(tmp_path):
+    """ingest_tree(exclude_globs=...) drops matching files even if include accepts them."""
+    src = tmp_path / "repo"
+    (src / "crates").mkdir(parents=True)
+    (src / "crates" / "kept.rs").write_text("fn kept() {}\n")
+    (src / "crates" / "_archive.rs").write_text("fn archived() {}\n")
+
+    registry = _make_registry_for_rust()
+    neo = FakeNeo4j()
+    pipeline = IngestPipeline(registry, postgres=None, neo4j=neo, embedder=None)
+    stats = pipeline.ingest_tree(src, exclude_globs=["crates/_archive.rs"])
+    assert stats.files_ingested == 1
+
+
+def test_ingest_tree_empty_globs_includes_everything(tmp_path):
+    """Default `include_globs=()` is "include everything" — back-compat."""
+    src = tmp_path / "repo"
+    (src / "crates").mkdir(parents=True)
+    (src / "crates" / "a.rs").write_text("fn a() {}\n")
+    (src / "crates" / "b.rs").write_text("fn b() {}\n")
+
+    registry = _make_registry_for_rust()
+    neo = FakeNeo4j()
+    pipeline = IngestPipeline(registry, postgres=None, neo4j=neo, embedder=None)
+    stats = pipeline.ingest_tree(src)
+    assert stats.files_ingested == 2
