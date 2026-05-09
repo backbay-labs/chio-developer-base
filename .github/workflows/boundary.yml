@@ -1,0 +1,61 @@
+name: boundary
+
+# M0-B.4 — close the long-lived-branch gap in the engine ↔ pack and
+# pack ↔ pack import-rule check.
+#
+# Background. eval.yml's `Engine ↔ pack boundary check` step is a
+# blocking gate but only fires on `pull_request` and `push` to `main`.
+# That meant a feature branch could accumulate boundary violations
+# undetected until the moment of PR. The Skeptic's M0 audit called
+# this out (see .cursor/scratchpad.md, "the boundary is real but
+# one-directional") and M0-B.4 is the wire that closes it.
+#
+# Design note. We considered relaxing eval.yml's filters to fire on
+# all pushes, but the rest of that workflow (uv sync, kb-engine
+# tests, chio-pack tests, outcome-eval runners) is comparatively
+# heavy and runs in ~minutes. The boundary check is ~1s. Splitting
+# it into its own minimal workflow buys per-push coverage at near-
+# zero CI cost. eval.yml remains the deeper gate on PR-to-main and
+# push-to-main; this is the lightweight pre-PR canary.
+#
+# Concurrency note. `boundary` and `eval.yml` will both fire on a
+# push that is also a PR commit. The boundary step inside eval.yml
+# is idempotent and the runtime cost is negligible, so duplication
+# is fine for the gate itself. We add a concurrency group keyed on
+# the workflow + ref so that a rapid succession of pushes to the
+# same branch cancels in-flight runs of THIS workflow only (not of
+# eval.yml).
+#
+# What we want to be able to say: every commit pushed to any branch
+# in this repo has had its imports checked. After M0-B.4 lands, that
+# is true.
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: boundary-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  boundary-check:
+    name: engine ↔ pack / pack ↔ pack imports
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: make check-boundary
+        run: make check-boundary
