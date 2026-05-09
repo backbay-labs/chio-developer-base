@@ -64,6 +64,17 @@ The flow:
    - Reports the local `make kb-eval-outcomes` result.
 6. **Address review feedback.** Maintainers may ask for an ADR if the change touches load-bearing infrastructure — that's not pushback, it's the contract.
 
+### Local boundary check (`make check-boundary`)
+
+The engine ↔ pack and pack ↔ pack boundaries (hard rule #3 above) are enforced in CI by [`ops/ci/check-imports.py`](ops/ci/check-imports.py). To catch a violation before pushing, run `make check-boundary` locally. The same check is collected by pytest (`chio-pack/tests/test_check_imports.py::test_repo_clean`) so it also fires on every `uv run pytest` invocation. To wire it as a git pre-commit hook (no `.pre-commit-config.yaml` is shipped — plugin choices are an ADR call), drop the following one-liner into `.git/hooks/pre-commit` and `chmod +x` it:
+
+```sh
+#!/bin/sh
+exec make check-boundary
+```
+
+That's it. The hook is local-only (not versioned) and entirely opt-in.
+
 ### The eval-gate contract
 
 [CI runs `make kb-eval-outcomes` on every PR](.github/workflows/eval.yml). Once Phase 0 is complete (per [ADR-0002](decisions/ADR-0002-phase-0-baselines.md) acceptance), the gate becomes blocking. Until then, it's informational — but PRs that visibly degrade an outcome eval will be asked to either revert or document the trade-off in an ADR.

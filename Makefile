@@ -1,14 +1,15 @@
 # chio-developer-base — Make targets
 #
 # Phase 0 (works today):
-#   help, kb-status, kb-migrate-seeds, kb-harvest-fixtures, kb-eval-outcomes-baseline
+#   help, kb-status, kb-migrate-seeds, kb-harvest-fixtures, kb-eval-outcomes-baseline,
+#   check-boundary
 # Phase 1+ (block until dependencies land — see PLAN.md):
 #   kb-up, kb-down, kb-reset, kb-reseed, kb-update, kb-live, kb-smoke
 #   kb-eval, kb-eval-retrieval, kb-eval-outcomes, kb-dogfood
 # Phase 2+ (bigger blocks):
 #   kb-bench, kb-verify, kb-gate-backtest
 
-.PHONY: help \
+.PHONY: help check-boundary \
         kb-status kb-migrate-seeds kb-harvest-fixtures kb-eval-outcomes-baseline \
         kb-up kb-down kb-reset kb-reseed kb-update kb-live kb-seed-memory kb-smoke \
         kb-eval kb-eval-retrieval kb-eval-outcomes kb-dogfood \
@@ -24,6 +25,9 @@ PYTHON       := uv run python
 help: ## list targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | sort | \
 	  awk 'BEGIN{FS=":.*?## "} {printf "  %-26s %s\n", $$1, $$2}'
+
+check-boundary: ## Phase 0: AGENTS.md hard rule #3 — engine ↔ pack and pack ↔ pack
+	@python3 ops/ci/check-imports.py
 
 kb-status: ## Phase 0: report what exists vs what's expected
 	@echo "== chio-developer-base status =="
