@@ -280,6 +280,45 @@ def query(query: str, limit: int) -> None:
         sys.exit(2)
 
 
+# === Pack scaffolding ===
+
+
+@main.command("init-pack")
+@click.argument("name")
+@click.option(
+    "--path",
+    "dest",
+    default=".",
+    show_default=True,
+    help="Parent directory to create <name>-pack/ inside.",
+)
+def init_pack(name: str, dest: str) -> None:
+    """Scaffold a new kb-engine plugin pack at <PATH>/<NAME>-pack/.
+
+    NAME must match `^[a-z][a-z0-9_]*$` (lowercase, underscore allowed,
+    must start with a letter — same rule W2-Multitenant uses for schema
+    namespaces).
+
+    The created pack is registrable as-is: stubs for the four protocols
+    (SourceIngester, GraphProjector, ToolRegistrar, FrontmatterHandler)
+    return sensible defaults so `Registry().load_entry_points()` finds
+    the pack without any hand-written code first. Each stub carries a
+    `# TODO(<name>-pack):` comment marking the next decision.
+
+    Refuses to overwrite an existing directory (exit 2).
+    """
+    from chio_pack.scaffold import ScaffoldError, scaffold_pack
+
+    dest_path = Path(dest)
+    try:
+        pack_dir = scaffold_pack(name, dest_path)
+    except ScaffoldError as e:
+        click.secho(f"error: {e}", fg="red", err=True)
+        sys.exit(2)
+    click.secho(f"created {pack_dir}", fg="green", err=True)
+    click.echo(str(pack_dir))
+
+
 # === Session log ===
 
 
