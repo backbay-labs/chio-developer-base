@@ -28,8 +28,15 @@ Returns JSON to stdout:
       "n_documented": <int>,
       "by_kind": {<kind>: {"count": int, "documented": int}, ...},
       "needs_manual_review": <int>,
-      "status": "ok" | "blocked-input"
+      "status": "ok" | "blocked-input",
+      "stub_warning": [<str>, ...]    # only present while stubs are in use
     }
+
+The `stub_warning` field surfaces correctness debt: as long as
+`_candidate_notes_stub` returns `[]`, every mistake is judged
+"not documented" and `rate` is biased toward 0%. The warning falls
+off the JSON output once the real Phase 1 KB-backed candidate-note
+recovery is wired up. See ADR-0002 methodology-deltas.
 """
 from __future__ import annotations
 
@@ -55,20 +62,38 @@ class Aggregate:
     by_kind: dict[str, dict[str, int]] = field(default_factory=lambda: defaultdict(lambda: {"count": 0, "documented": 0}))
     needs_manual_review: int = 0
     status: str = "ok"
+    stub_warnings: list[str] = field(default_factory=list)
+
+
+# A sentinel attribute lets tests + the runner detect that the candidate-notes
+# lookup is still the silent-zero stub. When the real Phase-1-backed
+# implementation lands it must NOT carry this attribute (or must set it to
+# False) so the warning falls off the runner output.
+_STUB_WARNING_TEXT = (
+    "_candidate_notes_stub returns []; until the Phase 1 KB stack (pgvector + "
+    "Neo4j + kb_search_*) is wired into the LLM-judge candidate-recovery path, "
+    "every mistake is judged 'not documented' by default and "
+    "repeated-mistake-rate is biased toward 0%. See ADR-0002 "
+    "methodology-deltas."
+)
 
 
 def _candidate_notes_stub(pre_context: str) -> list[dict[str, Any]]:
-    """Placeholder for "what was in retrieval top-3 for this context."
-
-    The real implementation calls kb_search_code / kb_search_docs against
-    a snapshot of the KB's index AT THE TIME of the mistake. That requires
-    the Phase 1 stack to be running. Until then, return [] so the LLM-judge
-    decides "not documented" by default.
-
-    A future enhancement: replay session tool_call events to recover the
-    actual results the agent saw.
-    """
+    # WARNING: stub returns []. Until Phase 1 KB stack is wired,
+    # was_documented will always be False, biasing repeated-mistake-rate
+    # toward 0%. See ADR-0002 methodology-deltas.
+    #
+    # Real implementation: call kb_search_code / kb_search_docs against
+    # a snapshot of the KB's index AT THE TIME of the mistake. That
+    # requires the Phase 1 stack to be running. A future enhancement is
+    # to replay session tool_call events to recover the actual results
+    # the agent saw.
     return []
+
+
+# Mark the stub so the runner can detect it without string matching.
+_candidate_notes_stub._is_stub = True  # type: ignore[attr-defined]
+_candidate_notes_stub._stub_warning = _STUB_WARNING_TEXT  # type: ignore[attr-defined]
 
 
 def _build_pre_context(events: list[dict[str, Any]], up_to_idx: int, max_chars: int = 4000) -> str:
@@ -82,6 +107,22 @@ def _build_pre_context(events: list[dict[str, Any]], up_to_idx: int, max_chars: 
     return text
 
 
+def _collect_active_stub_warnings() -> list[str]:
+    """Return warning strings for any stubs still in play.
+
+    The runner is the single place that decides whether to surface
+    correctness debt. Each stub advertises itself by setting an
+    `_is_stub` attribute on its callable; we collect their
+    `_stub_warning` text here so that real implementations can
+    replace the stub without needing to also remember to clear a
+    warning list elsewhere.
+    """
+    warnings: list[str] = []
+    if getattr(_candidate_notes_stub, "_is_stub", False):
+        warnings.append(getattr(_candidate_notes_stub, "_stub_warning", _STUB_WARNING_TEXT))
+    return warnings
+
+
 def run(
     inputs_dir: pathlib.Path,
     rolling_window: int = 50,
@@ -90,18 +131,23 @@ def run(
     model_call: llm_judge.ModelCallable | None = None,
 ) -> Aggregate:
     paths = sorted(pathlib.Path(p) for p in glob.glob(str(inputs_dir / "*.jsonl")))
+    stub_warnings = _collect_active_stub_warnings()
+
     if not paths:
-        return Aggregate(status="blocked-input")
+        return Aggregate(status="blocked-input", stub_warnings=stub_warnings)
 
     # Window: most recent N sessions
     paths = paths[-rolling_window:]
 
     if len(paths) < baseline_min_sessions:
         # Below baseline — return aggregate with status flagged
-        agg = Aggregate(n_sessions=len(paths), status="blocked-input")
-        return agg
+        return Aggregate(
+            n_sessions=len(paths),
+            status="blocked-input",
+            stub_warnings=stub_warnings,
+        )
 
-    agg = Aggregate(n_sessions=len(paths))
+    agg = Aggregate(n_sessions=len(paths), stub_warnings=stub_warnings)
 
     for path in paths:
         events = session_log.load_session(path)
@@ -153,6 +199,8 @@ def main() -> int:
         "needs_manual_review": agg.needs_manual_review,
         "status": agg.status,
     }
+    if agg.stub_warnings:
+        out["stub_warning"] = agg.stub_warnings
     print(json.dumps(out, indent=2))
     return 0 if agg.status == "ok" else 1
 
