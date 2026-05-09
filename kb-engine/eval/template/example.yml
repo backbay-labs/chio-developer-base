@@ -1,0 +1,48 @@
+# Example retrieval-eval fixture. Copy this file into your pack at
+# `eval/fixtures/<category>/<id>.yml`, replace the placeholder values,
+# and remove the `_example: true` marker. The runner skips fixtures
+# with `_example: true` so this template never counts toward the A
+# floor or fixture_count_min.
+
+_example: true
+
+# Stable kebab-case identifier. Convention: <topic>-<short-slug>-<YYYY-MM-DD>.
+id: example-receipt-checkpoint-recall-2026-05-08
+
+# One of the nine PR-#599 categories. See README.md for the full list.
+# Most retrieval fixtures are `code-retrieval` or `docs-retrieval`; pick
+# the category your fixture's `expected` files most strongly belong to.
+category: docs-spec-retrieval
+
+# The free-text retrieval input. Keep it realistic — agents in the
+# wild ask vague questions, and retrieval must handle them. Don't
+# pre-trim or canonicalize.
+query: |
+  Where is the checkpoint inclusion proof defined for revoke receipts?
+
+# Canonical documents that a correct top-k must surface. Use file
+# paths relative to the indexed corpus root. p_at_k computes
+# |expected ∩ top_k| / |expected|; MRR uses the rank of the first
+# expected hit. Multi-doc fixtures cap at p@k = k/N — the eval is
+# biased toward retrieval surfacing the MOST authoritative file first.
+expected:
+  - docs/standards/CHIO_RECEIPTS_PROFILE.md
+  - spec/schemas/chio-wire/v1/receipt/inclusion-proof.schema.json
+  - crates/chio-receipts/src/checkpoint.rs
+
+# Which scoring metrics this fixture participates in. Subset of
+# `[p_at_k, mrr]`. The runner computes both when listed; aggregate
+# scores are per-category mean across the fixture set.
+metrics:
+  - p_at_k
+  - mrr
+
+# Curator note. Free-form prose explaining why this fixture is in the
+# set — what's hard about it, what it tests beyond raw recall, what
+# adopters can learn from running their own packs against it.
+notes: |
+  Cross-section retrieval — the canonical fix touches docs/, spec/,
+  AND crates/. A fixture that gets the prose right but misses the
+  schema is not a passing fixture; this is what makes the category
+  `docs-spec-retrieval` pressure-test the engine more than either
+  `code-retrieval` or `docs-retrieval` alone.
