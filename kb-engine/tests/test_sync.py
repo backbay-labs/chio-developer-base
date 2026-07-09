@@ -88,6 +88,27 @@ def test_jsonl_router_appends(tmp_path):
     assert parsed[1]["target"] == "neo4j"
 
 
+def test_jsonl_router_register_target_rewrites_selected_records(tmp_path):
+    p = tmp_path / "audit.jsonl"
+    r = JsonlRouter(p)
+    r.register_target("graphiti", "demo_graph")
+
+    r.write([DerivedRecord(target="graphiti", payload={"id": "ep.x"})])
+
+    import json
+    line = json.loads(p.read_text().strip())
+    assert line["target"] == "demo_graph"
+
+
+def test_null_router_register_target_tracks_aliases():
+    r = NullRouter()
+    r.register_target("graphiti", "demo_graph")
+
+    r.write([DerivedRecord(target="graphiti", payload={"id": "ep.x"})])
+
+    assert r.received[0].target == "demo_graph"
+
+
 # === VaultSyncDaemon ===
 
 

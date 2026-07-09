@@ -1,0 +1,12 @@
+id: governed-agent-memory-playbook-2026-07-08
+category: docs-retrieval
+query: |
+  vault/playbooks/governed-agent-memory.md — Governed Agent Memory playbook
+  covering kb_memory_add, kb_memory_query, kb_memory_revoke
+expected:
+  - vault/playbooks/governed-agent-memory.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Wave 6 GAM v0 dogfood entry point.

@@ -1,0 +1,13 @@
+id: kb-impact-tool-2026-07-08
+category: graph-navigation-impact
+query: |
+  Where is kb_impact implemented — estimating related components, tests,
+  and docs for a path or crate via graph neighbors plus lexical search?
+expected:
+  - chio-pack/chio_pack/tools/kb_impact.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Ports arc graph-impact-delegation-tests shape onto the local impact
+  tool used by the PR-time gate.

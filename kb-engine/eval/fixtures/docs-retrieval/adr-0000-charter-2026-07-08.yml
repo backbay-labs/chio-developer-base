@@ -1,0 +1,12 @@
+id: adr-0000-charter-2026-07-08
+category: docs-retrieval
+query: |
+  ADR-0000-charter.md — Charter: chio-developer-base project charter that
+  defines the Chio KB carve-out's mission and non-goals
+expected:
+  - decisions/ADR-0000-charter.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Charter ADR establishing repo scope.

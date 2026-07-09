@@ -1,0 +1,16 @@
+id: governed-memory-playbook-2026-07-08
+category: graphiti-memory
+query: |
+  Locate vault/playbooks/governed-agent-memory.md — the playbook for
+  Governed Agent Memory covering kb_memory_add, kb_memory_query,
+  kb_memory_revoke, and vault session episodes synced by vault-sync
+  without agents writing Graphiti directly.
+expected:
+  - vault/playbooks/governed-agent-memory.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Arc graphiti-memory fixtures used expected_text_terms against live
+  Graphiti; this stack indexes the playbook that defines the memory
+  contract (episodes themselves are not in sources.toml).

@@ -1,0 +1,12 @@
+id: release-qualification-playbook-2026-07-08
+category: docs-retrieval
+query: |
+  vault/playbooks/release-qualification.md playbook for qualifying a Chio
+  release including eval gate, receipt verification, and boundary check
+expected:
+  - vault/playbooks/release-qualification.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Playbook that ties eval + receipts + boundary together.

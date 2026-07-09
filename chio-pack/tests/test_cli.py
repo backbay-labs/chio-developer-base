@@ -212,3 +212,45 @@ def test_sync_help_advertises_pack_schema_flag():
     result = runner.invoke(main, ["sync", "--help"])
     assert result.exit_code == 0
     assert "--pack-schema" in result.output
+
+
+def test_verify_command_accepts_signed_response(tmp_path):
+    from kb_engine.receipt import sign_response
+
+    response = sign_response(
+        {
+            "status": "ok",
+            "tool": "kb_search_code",
+            "query": "verify me",
+            "results": [{"file_path": "x.py"}],
+            "index_snapshot": "test",
+        }
+    )
+    path = tmp_path / "response.json"
+    path.write_text(__import__("json").dumps(response), encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["verify", str(path)])
+    assert result.exit_code == 0, result.output
+    assert "receipt verified" in result.output
+
+
+def test_verify_command_rejects_tampered_response(tmp_path):
+    from kb_engine.receipt import sign_response
+
+    response = sign_response(
+        {
+            "status": "ok",
+            "tool": "kb_search_code",
+            "query": "verify me",
+            "results": [{"file_path": "x.py", "similarity": 0.9}],
+        }
+    )
+    response["results"][0]["similarity"] = 0.1
+    path = tmp_path / "response.json"
+    path.write_text(__import__("json").dumps(response), encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["verify", str(path)])
+    assert result.exit_code == 1
+    assert "verification failed" in result.output

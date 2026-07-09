@@ -22,8 +22,8 @@ FIXTURE_DIR = Path(__file__).parent / "fixtures" / "text-ingest"
 
 def test_registry_seeds_builtins_on_construction():
     r = Registry()
-    # Three builtins: python, typescript, markdown.
-    assert len(r._builtin_source_ingesters) == 3
+    # Four builtins: python, typescript, markdown, text (Makefile/Dockerfile/yml/…).
+    assert len(r._builtin_source_ingesters) == 4
 
 
 def test_registry_ingest_file_routes_python_to_builtin():

@@ -3,7 +3,7 @@ id: spec.receipt.commitment
 type: spec
 status: accepted
 chio-node: Receipt
-crate: chio-receipts
+crate: chio-core-types
 supersedes: []
 related-specs:
   - spec.capability.revocation
@@ -60,17 +60,18 @@ The decision to use a Merkle commitment chain (rather than per-receipt signature
 
 ## Implements
 
-- `chio_receipts::checkpoint` — checkpoint construction and signing (`crates/chio-receipts/src/checkpoint.rs`)
-- `chio_receipts::merkle` — Merkle path construction (`crates/chio-receipts/src/merkle.rs`)
-- `chio_receipts::verify` — offline verifier (`crates/chio-receipts/src/verify.rs`)
+- `chio_core_types::receipt::checkpoint` — checkpoint construction (`crates/core/chio-core-types/src/receipt/checkpoint.rs`)
+- `chio_core_types::merkle` — Merkle path construction (`crates/core/chio-core-types/src/merkle.rs`)
+- `chio_core_types::receipt::signing` — receipt signing (`crates/core/chio-core-types/src/receipt/signing.rs`)
+- `chio_eval_receipt` — offline eval-report bundle verifier (`crates/sdk/chio-eval-receipt/`)
 - Schema: `spec/schemas/chio-wire/v1/receipt/inclusion-proof.schema.json`
 - Schema: `spec/schemas/chio-wire/v1/receipt/checkpoint.schema.json`
 - Schema: `spec/schemas/chio-wire/v1/receipt/README.md`
 
 ## Tested by
 
-- `crates/chio-receipts/tests/checkpoint_inclusion.rs` — leaf → checkpoint resolution
-- `crates/chio-receipts/tests/append_only.rs` — fork-detection
+- `crates/core/chio-core-types/src/receipt/tests.rs` — receipt unit tests
+- `crates/sdk/chio-eval-receipt/` — eval-report bundle verification
 - `tests/conformance/peers/python/test_receipts.py` — SDK conformance (Python)
 - `tests/conformance/peers/js/test_receipts.test.ts` — SDK conformance (JS/TS)
 - `docs/conformance/verdict-matrix.md` — cross-peer pass/fail snapshot
@@ -91,7 +92,7 @@ When changing the wire format under `spec/schemas/chio-wire/v1/receipt/`, **pref
 ## Staleness
 
 > [!warning-staleness]
-> Last validated 2026-05-07. The wire schemas under `spec/schemas/chio-wire/v1/receipt/` are the canonical surface — re-read this spec against them and against `crates/chio-receipts/src/` whenever the schema bumps.
+> Last validated 2026-07-08. The wire schemas under `spec/schemas/chio-wire/v1/receipt/` are the canonical surface — re-read this spec against them and against `crates/core/chio-core-types/src/receipt/` whenever the schema bumps.
 
 The [[../_meta/queries/stale-specs|stale-specs query]] flags this when `last-validated:` is 90+ days behind today.
 

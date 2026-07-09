@@ -28,7 +28,7 @@ query: |
 expected:
   - docs/standards/CHIO_RECEIPTS_PROFILE.md
   - spec/schemas/chio-wire/v1/receipt/inclusion-proof.schema.json
-  - crates/chio-receipts/src/checkpoint.rs
+  - crates/core/chio-core-types/src/receipt/checkpoint.rs
 
 # Which scoring metrics this fixture participates in. Subset of
 # `[p_at_k, mrr]`. The runner computes both when listed; aggregate

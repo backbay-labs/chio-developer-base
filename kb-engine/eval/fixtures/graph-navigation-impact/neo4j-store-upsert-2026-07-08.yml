@@ -1,0 +1,15 @@
+id: neo4j-store-upsert-2026-07-08
+category: graph-navigation-impact
+query: |
+  Which store module upserts generic Node and Edge records into Neo4j
+  with Cypher MERGE so graph navigation indexes stay idempotent under
+  re-ingest?
+expected:
+  - kb-engine/kb_engine/store/neo4j.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Backing store for kb_neighbors / kb_context / kb_impact; category
+  still valid when Neo4j is empty because the code describes the
+  navigation index contract.

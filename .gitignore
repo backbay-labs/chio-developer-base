@@ -67,3 +67,4 @@ Thumbs.db
 .idea/
 *.swp
 .vscode/settings.json
+.worktrees/

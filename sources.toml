@@ -1,0 +1,37 @@
+# Wave 1 sources for retrieval-A on THIS stack.
+# Indexes the carve-out repo itself (not empty sibling arc/).
+# Key is `glob` (include is accepted as an alias by the loader).
+
+[[source]]
+pack = "chio"
+root = "."
+glob = [
+  "kb-engine/**/*.py",
+  "chio-pack/**/*.py",
+  "infra/**/*.py",
+  "infra/Dockerfile*",
+  "ops/**/*.py",
+  "ops/**/*.sh",
+  "Makefile",
+  "PLAN.md",
+  "AGENTS.md",
+  "CLAUDE.md",
+  "decisions/**/*.md",
+  "vault/spec/**/*.md",
+  "vault/playbooks/**/*.md",
+  "kb-engine/tests/**/*.py",
+  "chio-pack/tests/**/*.py",
+]
+exclude = [
+  "**/__pycache__/**",
+  "**/.venv/**",
+  "**/uv.lock",
+  ".cursor/**",
+  "**/.cursor/**",
+  "**/eval/fixtures/**",
+  "kb-engine/eval/fixtures/**",
+  "chio-pack/eval/fixtures/**",
+  "vault/_meta/**",
+  "vault/daily/**",
+  "vault/episodes/**",
+]

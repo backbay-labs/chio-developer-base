@@ -80,6 +80,23 @@ def test_optional_globs_and_excludes(tmp_path):
     assert sources[0].exclude == ("**/_archive/**",)
 
 
+def test_include_alias_maps_to_glob(tmp_path):
+    """`include = [...]` is accepted as an alias for `glob = [...]`."""
+    src_root = tmp_path / "corpus"
+    src_root.mkdir()
+    cfg_path = _write(
+        tmp_path / "sources.toml",
+        f'''
+        [[source]]
+        pack = "alexandria"
+        root = "{src_root}"
+        include = ["**/*.md"]
+        ''',
+    )
+    sources = load_sources_toml(cfg_path, known_packs={"alexandria"})
+    assert sources[0].glob == ("**/*.md",)
+
+
 def test_multiple_source_entries_preserve_order(tmp_path):
     a = tmp_path / "a"
     b = tmp_path / "b"

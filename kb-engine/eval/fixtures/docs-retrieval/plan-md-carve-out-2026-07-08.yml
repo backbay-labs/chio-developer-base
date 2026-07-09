@@ -1,0 +1,12 @@
+id: plan-md-carve-out-2026-07-08
+category: docs-retrieval
+query: |
+  What is the canonical phase plan for chio-developer-base and how does
+  it define the carve-out from arc PR #599?
+expected:
+  - PLAN.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  PLAN.md is the source of truth per AGENTS.md.

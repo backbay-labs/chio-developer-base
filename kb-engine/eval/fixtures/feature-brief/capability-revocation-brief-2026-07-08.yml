@@ -1,0 +1,13 @@
+id: capability-revocation-brief-2026-07-08
+category: feature-brief
+query: |
+  playbooks/revoke-a-capability.md — editing brief for delegated capability
+  revocation with signed receipts; which playbook should an agent read first?
+expected:
+  - vault/playbooks/revoke-a-capability.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Ports arc feature-brief-revocation-receipts shape onto this repo's
+  indexed playbook (sources.toml includes vault/playbooks/**).

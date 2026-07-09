@@ -1,0 +1,12 @@
+id: agents-hard-rules-2026-07-08
+category: docs-retrieval
+query: |
+  AGENTS.md hard rules: Never write to Graphiti directly; kb-engine cannot
+  import chio_*; vault-sync daemon is the only Graphiti writer
+expected:
+  - AGENTS.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Docs retrieval over vault/repo prose. AGENTS.md is the agent contract.

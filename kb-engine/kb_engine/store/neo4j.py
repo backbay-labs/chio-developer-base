@@ -204,15 +204,19 @@ class Neo4jStore:
     def query_neighbors(self, node_id: str, depth: int = 1, limit: int = 50) -> list[dict[str, Any]]:
         """Return neighbors within `depth` hops of `node_id`. Phase 1.3
         helper for the kb_neighbors MCP tool (Phase 1.3+ wires it).
+
+        Neo4j forbids parameters in variable-length path bounds
+        (``*1..$depth``), so depth is inlined as a bounded integer.
         """
+        hops = max(1, min(int(depth), 8))
         cypher = (
-            "MATCH (n {id: $id})-[r*1..$depth]-(m) "
+            f"MATCH (n {{id: $id}})-[r*1..{hops}]-(m) "
             "RETURN m.id AS id, labels(m) AS labels, "
             "       [rel IN r | type(rel)] AS path "
             "LIMIT $limit"
         )
         with self.driver.session(database=self.database) as session:
-            result = session.run(cypher, id=node_id, depth=depth, limit=limit)
+            result = session.run(cypher, id=node_id, limit=limit)
             return [dict(record) for record in result]
 
     def delete_node(self, node_id: str) -> int:

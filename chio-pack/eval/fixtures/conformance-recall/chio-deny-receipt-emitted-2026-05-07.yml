@@ -12,7 +12,7 @@ canonical_fix:
     section: "expected receipt emission"
   - file: "crates/chio-guards/src/pipeline.rs"
     section: "verdict receipt emission"
-  - file: "crates/chio-receipts/src/lib.rs"
+  - file: "crates/core/chio-core-types/src/receipt/mod.rs"
     section: "guard-verdict receipt construction"
   - file: "spec/PROTOCOL.md"
     section: "Deny receipts (chio-extension)"

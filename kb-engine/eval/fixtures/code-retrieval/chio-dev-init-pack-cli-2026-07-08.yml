@@ -1,0 +1,14 @@
+id: chio-dev-init-pack-cli-2026-07-08
+category: code-retrieval
+query: |
+  Locate chio-pack/chio_pack/cli.py — the chio-dev CLI module that
+  implements the init-pack scaffold command generating a new pack
+  directory with pyproject.toml and test_register.py.
+expected:
+  - chio-pack/chio_pack/cli.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  M1-CLI.1 deliverable — init-pack scaffold that emits a registerable
+  second-pack skeleton.

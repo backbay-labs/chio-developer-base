@@ -1,0 +1,496 @@
+{
+  "fixtures": 60,
+  "true_positive": 18,
+  "false_positive": 0,
+  "true_negative": 32,
+  "false_negative": 10,
+  "precision": 1.0,
+  "recall": 0.6428571428571429,
+  "meets_advisory_floor": false,
+  "per_fixture": [
+    {
+      "name": "spec-change",
+      "source": "synthetic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "engine-change",
+      "source": "synthetic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "pack-tool-change",
+      "source": "synthetic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "guard-policy",
+      "source": "synthetic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "docs-only",
+      "source": "synthetic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "ci-only",
+      "source": "synthetic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "makefile-only",
+      "source": "synthetic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "acknowledged",
+      "source": "synthetic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "acknowledged"
+    },
+    {
+      "name": "adr-docs",
+      "source": "synthetic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "infra-compose",
+      "source": "synthetic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-960",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": true,
+      "label": "fn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-954",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-953",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": true,
+      "label": "fn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-952",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": true,
+      "label": "fn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-951",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": true,
+      "label": "fn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-950",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": true,
+      "label": "fn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-949",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-948",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": true,
+      "label": "fn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-947",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": true,
+      "label": "fn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-931",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "arc-pr-930",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-929",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "arc-pr-928",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-925",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "arc-pr-924",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "arc-pr-923",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-915",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-914",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-913",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": true,
+      "label": "fn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-904",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-902",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-901",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-899",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-888",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-869",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-865",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "arc-pr-855",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-850",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-835",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "arc-pr-833",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-832",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-831",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-825",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": true,
+      "label": "fn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-794",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "arc-pr-692",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "arc-pr-685",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "arc-pr-684",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": true,
+      "label": "fn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-683",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "arc-pr-682",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "arc-pr-681",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-680",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "arc-pr-679",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-678",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": true,
+      "expected_impact": true,
+      "label": "tp",
+      "status": "warn"
+    },
+    {
+      "name": "arc-pr-677",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-676",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-675",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-674",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-673",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-672",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    },
+    {
+      "name": "arc-pr-671",
+      "source": "arc-gh-heuristic",
+      "predicted_impact": false,
+      "expected_impact": false,
+      "label": "tn",
+      "status": "pass"
+    }
+  ],
+  "mode": "synthetic+arc-gh-heuristic",
+  "note": "Includes gh-merged PR file lists with heuristic expected_impact (capability/receipt/guard/core paths). Not follow-up-within-14d ground truth \u2014 stays advisory.",
+  "target_precision": 0.7,
+  "target_recall": 0.8
+}

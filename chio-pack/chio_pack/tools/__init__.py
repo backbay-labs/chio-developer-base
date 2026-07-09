@@ -1,4 +1,4 @@
-"""The 10 ``kb_*`` MCP tools owned by chio-pack.
+"""The ``kb_*`` MCP tools owned by chio-pack.
 
 Per PLAN.md "Plugin/extension architecture" and AGENTS.md "The 10 MCP
 tools", each tool is a small module exposing four attributes:
@@ -8,22 +8,20 @@ tools", each tool is a small module exposing four attributes:
   - ``INPUT_SCHEMA`` (dict): JSON-Schema for the tool's arguments.
   - ``call(arguments: dict) -> dict``: the tool implementation.
 
-The 10 tools are wired into the gateway by
+The canonical 10 retrieval/eval tools are wired into the gateway by
 :func:`chio_pack.plugin.chio_tool_registrar`, which calls
 ``server.register_tool(name, description, input_schema, call)`` once per
 tool. The ``server`` is duck-typed — any object with a callable
 ``register_tool`` attribute satisfies the contract. Tests use the
 :class:`chio_pack.tools.fake_server.FakeServer`. Production uses the
-Phase 1.3+ MCP-server-framework handle.
+MCP gateway handle in ``infra/chio-kb-mcp-server.py``.
 
-The implementations themselves are deliberately thin shims that return
-``{"status": "stub", "reason": "Phase 1.3+", ...}`` until the underlying
-retrieval path is wired (Phase 1.3+, see PLAN.md). The point of landing
-the registrar now is the plugin contract — once ``register_tool`` is
-proven end-to-end, swapping a stub for a real query is one-line work
-inside the relevant tool module.
+Each tool module implements a real ``call(arguments)`` path (Postgres /
+Neo4j / vault / eval runners via ``chio_pack.runtime``). Stubs are no
+longer the default return shape.
 
-The schema fields here mirror arc PR #599's ``mcp-server`` so a client
+Wave 6 adds three governed-memory tools after the canonical 10. The schema
+fields here mirror arc PR #599's ``mcp-server`` so a client
 that worked against arc's ``CHIO_KB_MCP`` continues to work against the
 chio-developer-base gateway.
 """
@@ -37,12 +35,15 @@ from . import (
     kb_find_docs,
     kb_find_tests,
     kb_impact,
+    kb_memory_add,
+    kb_memory_query,
+    kb_memory_revoke,
     kb_neighbors,
     kb_search_code,
     kb_search_docs,
 )
 
-# Canonical order matches AGENTS.md "The 10 MCP tools".
+# First 10 preserve AGENTS.md "The 10 MCP tools"; Wave 6 memory tools follow.
 ALL_TOOLS = (
     kb_search_code,
     kb_search_docs,
@@ -54,6 +55,9 @@ ALL_TOOLS = (
     kb_brief_feature,
     kb_eval,
     kb_add_episode,
+    kb_memory_add,
+    kb_memory_query,
+    kb_memory_revoke,
 )
 
 ALL_NAMES = tuple(t.NAME for t in ALL_TOOLS)
@@ -71,4 +75,7 @@ __all__ = [
     "kb_brief_feature",
     "kb_eval",
     "kb_add_episode",
+    "kb_memory_add",
+    "kb_memory_query",
+    "kb_memory_revoke",
 ]

@@ -88,6 +88,8 @@ class Router(Protocol):
 
     def on_record_deleted(self, node_id: str, source_path: Path) -> None: ...
 
+    def register_target(self, source: str, target: str) -> None: ...
+
 
 class NullRouter:
     """Drops everything. For tests + dry-run.
@@ -100,11 +102,21 @@ class NullRouter:
     def __init__(self) -> None:
         self.received: list[DerivedRecord] = []
         self.deleted: list[tuple[str, Path]] = []
+        self._target_aliases: dict[str, str] = {}
+
+    def register_target(self, source: str, target: str) -> None:
+        self._target_aliases[source] = target
+
+    def _map_record(self, record: DerivedRecord) -> DerivedRecord:
+        mapped_target = self._target_aliases.get(record.target, record.target)
+        if mapped_target == record.target:
+            return record
+        return DerivedRecord(target=mapped_target, payload=record.payload)
 
     def write(self, records: Iterable[DerivedRecord]) -> int:
         n = 0
         for r in records:
-            self.received.append(r)
+            self.received.append(self._map_record(r))
             n += 1
         return n
 
@@ -123,12 +135,22 @@ class JsonlRouter:
     def __init__(self, path: Path) -> None:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._target_aliases: dict[str, str] = {}
+
+    def register_target(self, source: str, target: str) -> None:
+        self._target_aliases[source] = target
+
+    def _map_target(self, target: str) -> str:
+        return self._target_aliases.get(target, target)
 
     def write(self, records: Iterable[DerivedRecord]) -> int:
         n = 0
         with self.path.open("a") as f:
             for r in records:
-                f.write(json.dumps({"target": r.target, "payload": r.payload}) + "\n")
+                f.write(json.dumps({
+                    "target": self._map_target(r.target),
+                    "payload": r.payload,
+                }) + "\n")
                 n += 1
         return n
 
@@ -173,6 +195,7 @@ class GraphitiHttpRouter:
         self.strict = strict
         self._post = post
         self._next_id = 1
+        self._target_aliases: dict[str, str] = {}
         self.failures: list[tuple[DerivedRecord, str]] = []
         # Graphiti is append-mostly per vault/episodes/_README.md ("How
         # to remove an episode: You don't, generally"). The daemon
@@ -214,11 +237,17 @@ class GraphitiHttpRouter:
             "params": {"name": self.tool_name, "arguments": arguments},
         }
 
+    def register_target(self, source: str, target: str) -> None:
+        self._target_aliases[source] = target
+
+    def _map_target(self, target: str) -> str:
+        return self._target_aliases.get(target, target)
+
     def write(self, records: Iterable[DerivedRecord]) -> int:
         post = self._post or self._default_post
         n = 0
         for r in records:
-            if r.target != "graphiti":
+            if self._map_target(r.target) != "graphiti":
                 continue
             envelope = self._build_envelope(r)
             try:

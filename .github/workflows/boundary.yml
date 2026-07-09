@@ -59,3 +59,6 @@ jobs:
 
       - name: make check-boundary
         run: make check-boundary
+
+      - name: Orphaned crate-path check (ADR-0002a)
+        run: make check-orphaned-crate-paths

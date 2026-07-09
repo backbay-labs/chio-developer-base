@@ -1,0 +1,18 @@
+id: receipt-checkpoint-inclusion
+category: conformance-recall
+status: draft
+query: "KB MCP receipt checkpoint inclusion"
+failing_test: "tests/conformance/peers/kb-mcp/receipt_checkpoint_inclusion.rs"
+failure_message: "KB MCP peer response did not include a verifiable retrieval receipt with index snapshot, result hash, and parent checkpoint fields."
+expected:
+  peer: kb-mcp
+  tool: kb_search_code
+  receipt_fields:
+    - index_snapshot
+    - result_hash
+    - parent_receipt_hash
+  verifier: chio-dev verify
+canonical_fix:
+  - file: kb-engine/kb_engine/receipt/envelope.py
+    section: RetrievalReceipt
+notes: "Initial KB peer fixture for receipt checkpoint inclusion and tamper rejection."

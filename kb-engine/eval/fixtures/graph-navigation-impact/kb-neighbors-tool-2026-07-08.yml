@@ -1,0 +1,14 @@
+id: kb-neighbors-tool-2026-07-08
+category: graph-navigation-impact
+query: |
+  Which tool module implements kb_neighbors depth-limited Neo4j
+  neighborhood traversal for a graph entity id?
+expected:
+  - chio-pack/chio_pack/tools/kb_neighbors.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Ports arc graph-neighbors shape onto the local kb_neighbors tool.
+  Live Neo4j content may be empty; fixture still targets the real
+  navigation entry point indexed by sources.toml.

@@ -169,7 +169,7 @@ canonical_fix:
     section: "Checkpoint inclusion"
   - file: spec/schemas/chio-wire/v1/receipt/inclusion-proof.schema.json
     section: full
-  - file: crates/chio-receipts/src/checkpoint.rs
+  - file: crates/core/chio-core-types/src/receipt/checkpoint.rs
     section: "checkpoint_root"
 relevant_arc_pr: arc#412
 ```

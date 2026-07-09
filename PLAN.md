@@ -324,7 +324,7 @@ class RetrievalReceipt:
 def wrap(response, gateway_capability) -> SignedResponse: ...
 ```
 
-**Eval.** A new eval category `signed-retrieval` in `chio_pack/eval/outcomes.yml`. Every fixture must produce a verifiable receipt. Receipt verification uses Chio's own `chio-receipts` crate — if the format ever drifts, the eval breaks.
+**Eval.** A new eval category `signed-retrieval` in `chio_pack/eval/outcomes.yml`. Every fixture must produce a verifiable receipt. Receipt verification uses `chio-core-types` (receipt types) and/or `chio-eval-receipt` (bundle verifier) — if the format ever drifts, the eval breaks. Default path for the KB gateway is a self-signed `DevSelfSignedSigner` in `kb-engine`; the Chio-capability signer is a `chio-pack` adapter.
 
 ---
 
@@ -410,7 +410,7 @@ These exist to gate the carve-out's value, not just retrieval quality.
 |---|------|-----------|
 | 2B.1 | `kb_engine/receipt/envelope.py`: `RetrievalReceipt` type + signing | Unit tests pass |
 | 2B.2 | Wire into MCP gateway: every response wrapped | `signed-retrieval` eval = 1.0 |
-| 2B.3 | Verifier in `chio_pack/tools/verify_retrieval.py` using `chio-receipts` crate (via PyO3 or shell) | `chio-dev verify <response>` returns ✓ |
+| 2B.3 | Verifier in `chio_pack/tools/verify_retrieval.py` using `chio-core-types` / `chio-eval-receipt` (via PyO3 or shell), with engine `DevSelfSignedSigner` as default | `chio-dev verify <response>` returns ✓ |
 | 2B.4 | Index/snapshot version emission: pgvector index version, Neo4j snapshot id | Receipts contain reproducible cursors |
 | 2B.5 | Capability for the gateway: scoped grant `kb.read.*`, `episodes.write.dev_notes` | Capability minted; gateway boots only with it |
 

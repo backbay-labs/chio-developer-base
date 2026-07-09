@@ -1,0 +1,12 @@
+id: chunker-split-2026-07-08
+category: code-retrieval
+query: |
+  Where is def chunk_text in kb_engine/chunker.py that splits long files
+  into overlapping paragraph and hard-line TextChunk windows?
+expected:
+  - kb-engine/kb_engine/chunker.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Wave 1 chunker upgrade past one-file-one-chunk.

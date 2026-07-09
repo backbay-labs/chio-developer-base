@@ -1,0 +1,12 @@
+id: test-memory-tools-2026-07-08
+category: test-discovery
+query: |
+  chio-pack/tests/test_memory_tools.py — pytest for Governed Agent Memory
+  tools kb_memory_add, kb_memory_query, and kb_memory_revoke
+expected:
+  - chio-pack/tests/test_memory_tools.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Guards Wave 6 GAM v0 tool behavior.

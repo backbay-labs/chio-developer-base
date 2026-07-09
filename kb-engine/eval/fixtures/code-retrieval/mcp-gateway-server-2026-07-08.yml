@@ -1,0 +1,13 @@
+id: mcp-gateway-server-2026-07-08
+category: code-retrieval
+query: |
+  infra/chio-kb-mcp-server.py — JSON-RPC 2.0 MCP gateway handling
+  initialize, tools/list, and tools/call over HTTP on port 8111
+expected:
+  - infra/chio-kb-mcp-server.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Wave 1 replaces the Phase 1.1 health stub with the real gateway
+  hosting the 10 kb_* tools.

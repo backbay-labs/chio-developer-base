@@ -23,13 +23,16 @@ from __future__ import annotations
 
 from .markdown import MarkdownIngester, markdown_source_ingester
 from .python import PythonIngester, python_source_ingester
+from .text import TextIngester, text_source_ingester
 from .typescript import TypescriptIngester, typescript_source_ingester
 
 __all__ = [
     "MarkdownIngester",
     "PythonIngester",
+    "TextIngester",
     "TypescriptIngester",
     "markdown_source_ingester",
     "python_source_ingester",
+    "text_source_ingester",
     "typescript_source_ingester",
 ]

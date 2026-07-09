@@ -9,11 +9,11 @@
 # Phase 2+ (bigger blocks):
 #   kb-bench, kb-verify, kb-gate-backtest
 
-.PHONY: help check-boundary \
+.PHONY: help check-boundary check-orphaned-crate-paths smoke-second-pack \
         kb-status kb-migrate-seeds kb-harvest-fixtures kb-eval-outcomes-baseline \
         kb-up kb-down kb-reset kb-reseed kb-update kb-live kb-seed-memory kb-smoke \
         kb-eval kb-eval-retrieval kb-eval-outcomes kb-dogfood \
-        kb-bench kb-verify kb-gate-backtest
+        kb-bench kb-verify kb-gate-backtest kb-peer-cell
 
 ARC_REPO     ?= ../arc
 COMPOSE_FILE := infra/docker-compose.yml
@@ -34,6 +34,15 @@ help: ## list targets
 
 check-boundary: ## Phase 0: AGENTS.md hard rule #3 — engine ↔ pack and pack ↔ pack
 	@python3 ops/ci/check-imports.py
+
+check-orphaned-crate-paths: ## Wave 0: fail on orphaned crates/chio-receipts/ refs (ADR-0002a)
+	@python3 ops/ci/check-orphaned-crate-paths.py
+
+check-demo-pack: ## Wave 2: init-pack demo + assert load_entry_points() >= 2
+	@python3 ops/ci/check-demo-pack.py
+
+smoke-second-pack: ## Wave 2: install generated demo pack + assert plugin discovery
+	@ops/ci/smoke-second-pack.sh
 
 kb-status: ## Phase 0: report what exists vs what's expected
 	@echo "== chio-developer-base status =="
@@ -126,9 +135,12 @@ kb-smoke: ## Phase 1: health + tools/list smoke
 kb-eval: kb-eval-retrieval kb-eval-outcomes ## Phase 1+: full eval gate
 
 kb-eval-retrieval: ## Phase 1: retrieval eval (PR #599 fixtures, A floor)
-	@test -f $(COMPOSE_FILE) || { echo "blocked: Phase 1 — $(COMPOSE_FILE) missing"; exit 1; }
-	docker compose -f $(COMPOSE_FILE) exec -T chio-kb-mcp \
-	  chio-kb-eval --suite retrieval --fail-below-a
+	@if docker compose -f $(COMPOSE_FILE) ps --status running 2>/dev/null | grep -q chio-kb-mcp; then \
+	  docker compose -f $(COMPOSE_FILE) exec -T chio-kb-mcp \
+	    chio-kb-eval --suite retrieval --fail-below-a; \
+	else \
+	  cd chio-pack && uv run chio-kb-eval --suite retrieval --fail-below-a; \
+	fi
 
 kb-eval-outcomes: ## Phase 0+: outcome evals (time-to-fix, repeated-mistake, …)
 	@test -f chio-pack/pyproject.toml || { echo "blocked: Phase 1.2 — chio-pack/ package not built"; exit 1; }
@@ -143,12 +155,18 @@ kb-dogfood: ## Phase 1: regenerate DOGFOOD-REVIEW.md
 
 # == Phase 2+ moonshots ==
 
-kb-bench: ## Phase 4: latency + memory + 200-file-PR gate benchmarks
-	@echo "blocked: Phase 4 — bench harness not implemented"; exit 1
+kb-bench: ## Wave 4: pgvector vs TurboVec dual-index bench
+	cd chio-pack && uv run python -m chio_pack.bench.dual_index
 
 kb-verify: ## Phase 2B: verify a retrieval receipt
-	@echo "blocked: Phase 2B — kb-engine/receipt/envelope.py not implemented"; exit 1
+	@test -n "$(RESPONSE)" || { echo "usage: make kb-verify RESPONSE=path/to/response.json"; exit 2; }
+	cd chio-pack && uv run chio-dev verify "$(RESPONSE)"
 
 kb-gate-backtest: ## Phase 2A: backtest PR-impact gate against last N arc PRs
-	@test -d "$(ARC_REPO)" || { echo "ERROR: ARC_REPO=$(ARC_REPO) missing"; exit 1; }
-	@echo "blocked: Phase 2A — chio-pr-gate/ not implemented"; exit 1
+	cd chio-pr-gate && uv run python -m chio_pr_gate.backtest \
+		--arc-repo "$(abspath $(ARC_REPO))" --limit 50 \
+		--out ../vault/_meta/dashboards/pr-gate-backtest.json
+
+kb-peer-cell: ## Wave 6: run local KB MCP conformance peer cell
+	PYTHONPATH=kb-engine:ops/ci python3 ops/ci/run_kb_peer_cell.py
+	cd kb-engine && uv run --no-project pytest ../vault/_meta/conformance/kb-mcp/ -q

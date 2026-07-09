@@ -1,0 +1,12 @@
+id: test-tool-registrar-2026-07-08
+category: test-discovery
+query: |
+  Where are the pytest tests that verify chio_tool_registrar registers
+  all 10 kb_* MCP tools with the expected names and input schemas?
+expected:
+  - chio-pack/tests/test_tool_registrar.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Guards the Wave 1 ToolRegistrar contract.

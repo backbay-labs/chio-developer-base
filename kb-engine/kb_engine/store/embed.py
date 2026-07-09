@@ -14,6 +14,7 @@ a one-line change at the boundary.
 from __future__ import annotations
 
 import hashlib
+import time
 from typing import Protocol
 
 
@@ -84,5 +85,22 @@ class OpenAIEmbedder:
         if not texts:
             return []
         client = self._ensure_client()
-        response = client.embeddings.create(model=self.model, input=texts)
-        return [d.embedding for d in response.data]
+        # Batch + retry: Wave 1 retrieval-A fires many short embeds and
+        # OpenAI 429s will otherwise produce empty-hit fixtures (grade F).
+        last_exc: Exception | None = None
+        for attempt in range(6):
+            try:
+                response = client.embeddings.create(model=self.model, input=texts)
+                return [d.embedding for d in response.data]
+            except Exception as exc:  # noqa: BLE001 — retry then raise
+                last_exc = exc
+                msg = str(exc).lower()
+                retryable = any(
+                    token in msg
+                    for token in ("rate limit", "429", "timeout", "temporarily", "overloaded")
+                )
+                if not retryable or attempt == 5:
+                    raise
+                time.sleep(min(2 ** attempt, 20))
+        assert last_exc is not None
+        raise last_exc

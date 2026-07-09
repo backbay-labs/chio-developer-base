@@ -476,6 +476,36 @@ def init_pack(name: str, dest: str) -> None:
     click.echo(str(pack_dir))
 
 
+
+@main.command('verify')
+@click.argument('response_json', type=click.Path(exists=True, dir_okay=False, path_type=Path))
+def verify_cmd(response_json: Path) -> None:
+    """Verify a signed retrieval response (Wave 4 / Phase 2B)."""
+    from kb_engine.receipt import verify_response
+
+    payload = json.loads(response_json.read_text(encoding='utf-8'))
+    ok, reason = verify_response(payload)
+    if ok:
+        click.secho('✓ receipt verified', fg='green')
+        sys.exit(0)
+    click.secho(f'✗ verification failed: {reason}', fg='red', err=True)
+    sys.exit(1)
+
+
+@main.command('retrieval-eval')
+@click.option('--fail-below-a', is_flag=True)
+@click.option('--fixtures', 'fixtures_dir', default=None)
+def retrieval_eval_cmd(fail_below_a: bool, fixtures_dir: str | None) -> None:
+    """Run retrieval fixtures against the live tool runtime."""
+    from chio_pack.eval.retrieval import run_retrieval_eval
+
+    fixtures = Path(fixtures_dir) if fixtures_dir else None
+    report = run_retrieval_eval(fixtures_dir=fixtures, fail_below_a=fail_below_a)
+    click.echo(json.dumps(report, indent=2))
+    if fail_below_a and report.get('grade') != 'A':
+        sys.exit(1)
+
+
 # === Session log ===
 
 

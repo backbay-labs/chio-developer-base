@@ -16,9 +16,8 @@ A pipeline run:
      so deduplication for code chunks is a chunker concern, not the
      pipeline's).
 
-For Phase 1.3 the chunker is naive: one chunk per ParsedFile, the
-chunk_text is parsed.text. Phase 1.4+ replaces with a real chunker
-(splits long files, tracks symbol-aligned boundaries).
+Phase 1.3+ uses :func:`kb_engine.chunker.chunk_text` for overlapping
+paragraph/line windows (replacing the prior one-chunk-per-file stub).
 """
 from __future__ import annotations
 
@@ -28,6 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
 
+from .chunker import TextChunk, chunk_text
 from .plugin import Registry
 from .store import Embedder, Neo4jStore, PostgresStore
 from .store.postgres import CodeChunk
@@ -89,10 +89,27 @@ class IngestPipeline:
 
     def ingest_file(self, file_path: Path, source_root: Path) -> tuple[int, int, int]:
         """Run all hooks for a single file. Returns (n_nodes, n_edges, n_chunks)."""
-        rel_path = str(file_path.relative_to(source_root))
-        parsed = self.registry.ingest_file(rel_path)
+        # Ingesters must receive an absolute path so they can read the file
+        # (builtins call read_text_safely on the path they are given). Store
+        # the repo-relative path on the ParsedFile / chunk rows for citations.
+        abs_path = file_path if file_path.is_absolute() else (Path.cwd() / file_path)
+        try:
+            rel_path = str(abs_path.resolve().relative_to(source_root.resolve()))
+        except ValueError:
+            rel_path = str(abs_path)
+        parsed = self.registry.ingest_file(str(abs_path))
         if parsed is None:
             return 0, 0, 0
+
+        # Normalize stored path to source-root-relative for stable citations.
+        if parsed.path != rel_path:
+            parsed = ParsedFile(
+                path=rel_path,
+                language=parsed.language,
+                text=parsed.text,
+                symbols=parsed.symbols,
+                properties=parsed.properties,
+            )
 
         # Read the actual file text if the ingester didn't already
         if not parsed.text:
@@ -100,7 +117,7 @@ class IngestPipeline:
                 parsed = ParsedFile(
                     path=parsed.path,
                     language=parsed.language,
-                    text=file_path.read_text(encoding="utf-8", errors="replace"),
+                    text=abs_path.read_text(encoding="utf-8", errors="replace"),
                     symbols=parsed.symbols,
                     properties=parsed.properties,
                 )
@@ -117,17 +134,59 @@ class IngestPipeline:
 
         n_chunks = 0
         if self.postgres and self.embedder and parsed.text:
-            chunk = CodeChunk(
-                file_path=parsed.path,
-                source_root=str(source_root),
-                language=parsed.language,
-                line_start=1,
-                line_end=parsed.text.count("\n") + 1,
-                chunk_text=parsed.text,
-                properties=dict(parsed.properties),
-            )
-            embeddings = self.embedder([chunk.chunk_text])
-            n_chunks = self.postgres.insert_code_chunks([chunk], embeddings)
+            # Prefer symbol/heading chunks from the ingester when present —
+            # they preserve citation anchors. Fall back to the generic
+            # paragraph chunker for whole-file text.
+            text_chunks: list[TextChunk] = []
+            prop_chunks = parsed.properties.get("chunks")
+            if (
+                isinstance(prop_chunks, list)
+                and parsed.symbols
+                and len(prop_chunks) == len(parsed.symbols)
+            ):
+                for sym, body in zip(parsed.symbols, prop_chunks):
+                    if not isinstance(body, str) or not body.strip():
+                        continue
+                    text_chunks.append(
+                        TextChunk(
+                            text=body,
+                            line_start=int(sym.line_start),
+                            line_end=int(sym.line_end),
+                        )
+                    )
+            if not text_chunks:
+                text_chunks = chunk_text(parsed.text)
+            if not text_chunks:
+                text_chunks = [
+                    TextChunk(
+                        text=parsed.text,
+                        line_start=1,
+                        line_end=max(1, parsed.text.count("\n") + 1),
+                    )
+                ]
+            # Drop bulky nested chunk lists from properties before storage.
+            props = {
+                k: v
+                for k, v in dict(parsed.properties).items()
+                if k != "chunks"
+            }
+            store_chunks = [
+                CodeChunk(
+                    file_path=parsed.path,
+                    source_root=str(source_root),
+                    language=parsed.language,
+                    line_start=tc.line_start,
+                    line_end=tc.line_end,
+                    chunk_text=tc.text,
+                    properties=props,
+                )
+                for tc in text_chunks
+            ]
+            embeddings = self.embedder([c.chunk_text for c in store_chunks])
+            if _is_doc_path(parsed.path, parsed.language):
+                n_chunks = self.postgres.insert_doc_chunks(store_chunks, embeddings)
+            else:
+                n_chunks = self.postgres.insert_code_chunks(store_chunks, embeddings)
 
         return n_nodes, n_edges, n_chunks
 
@@ -159,6 +218,79 @@ class IngestPipeline:
         return stats
 
 
+_DOC_LANGS = {"markdown", "md", "rst", "asciidoc"}
+# Note: language "text" (Makefile/Dockerfile/yml via TextIngester) is NOT
+# automatically a doc — route by path/extension instead so operator files
+# stay in code_chunks unless they live under vault/docs/spec paths.
+_DOC_PATH_MARKERS = (
+    "/docs/",
+    "/doc/",
+    "/spec/",
+    "/specs/",
+    "/standards/",
+    "/vault/",
+    "/playbooks/",
+    "/decisions/",
+    "/episodes/",
+)
+
+
+def _is_doc_path(path: str, language: str) -> bool:
+    """Route markdown/docs paths into doc_chunks; everything else to code_chunks."""
+    if language.lower() in _DOC_LANGS:
+        return True
+    lowered = f"/{path.lower().replace(chr(92), '/')}"
+    if any(marker in lowered for marker in _DOC_PATH_MARKERS):
+        return True
+    return path.lower().endswith((".md", ".mdx", ".rst", ".adoc", ".txt"))
+
+
+def _glob_match(rel: str, pattern: str) -> bool:
+    """Match a repo-relative path against a sources.toml glob.
+
+    ``fnmatch`` treats ``**`` as two ``*`` characters, so patterns like
+    ``decisions/**/*.md`` fail to match single-segment paths such as
+    ``decisions/ADR-0000-charter.md``. This helper gives gitignore-style
+    ``**`` semantics: zero or more path segments.
+    """
+    import re
+
+    rel_n = rel.replace("\\", "/")
+    pat_n = pattern.replace("\\", "/")
+    if "**" not in pat_n:
+        return fnmatch.fnmatch(rel_n, pat_n)
+
+    # Translate gitignore-style globs to a regex.
+    # **/  → optional multi-segment prefix
+    # /**  → optional multi-segment suffix
+    # **   → any characters including /
+    # *    → any characters except /
+    # ?    → any single character except /
+    out: list[str] = ["^"]
+    i = 0
+    while i < len(pat_n):
+        if pat_n.startswith("**/", i):
+            out.append("(?:.*/)?")
+            i += 3
+        elif pat_n.startswith("/**", i):
+            out.append("(?:/.*)?")
+            i += 3
+        elif pat_n.startswith("**", i):
+            out.append(".*")
+            i += 2
+        elif pat_n[i] == "*":
+            out.append("[^/]*")
+            i += 1
+        elif pat_n[i] == "?":
+            out.append("[^/]")
+            i += 1
+        else:
+            out.append(re.escape(pat_n[i]))
+            i += 1
+    out.append("$")
+    return re.match("".join(out), rel_n) is not None
+
+
 def _path_matches(
     path: Path,
     source_root: Path,
@@ -169,15 +301,15 @@ def _path_matches(
 
     Empty `include_globs` matches all paths (open by default). Excludes
     are applied after includes. Patterns are matched relative to
-    `source_root` using fnmatch — same semantics as Python's stdlib
-    glob module, which is the convention sources.toml documents.
+    `source_root` with gitignore-style ``**`` semantics (see
+    :func:`_glob_match`).
     """
     try:
-        rel = str(path.relative_to(source_root))
+        rel = str(path.relative_to(source_root)).replace("\\", "/")
     except ValueError:
         return False
-    if include_globs and not any(fnmatch.fnmatch(rel, g) for g in include_globs):
+    if include_globs and not any(_glob_match(rel, g) for g in include_globs):
         return False
-    if any(fnmatch.fnmatch(rel, g) for g in exclude_globs):
+    if any(_glob_match(rel, g) for g in exclude_globs):
         return False
     return True

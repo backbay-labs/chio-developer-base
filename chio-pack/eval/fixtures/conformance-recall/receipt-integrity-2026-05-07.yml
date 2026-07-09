@@ -9,9 +9,9 @@ failure_message: |
 canonical_fix:
   - file: "tests/conformance/native/scenarios/receipt-integrity.json"
     section: "receipt_tamper_rejected assertion"
-  - file: "crates/chio-receipts/src/verify.rs"
+  - file: "crates/core/chio-core-types/src/receipt/signing.rs"
     section: "verify_receipt"
-  - file: "crates/chio-receipts/src/checkpoint.rs"
+  - file: "crates/core/chio-core-types/src/receipt/checkpoint.rs"
     section: "checkpoint_root"
   - file: "spec/schemas/chio-wire/v1/receipt/inclusion-proof.schema.json"
     section: "full schema"

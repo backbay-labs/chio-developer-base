@@ -46,7 +46,9 @@ class FakeNeo4j:
 
 
 def _make_registry_for_rust():
-    r = Registry()
+    # Pack-only registry: these tests assert rust-ingester behavior without
+    # the kb-engine builtins claiming .py/.md/.txt files.
+    r = Registry(seed_builtins=False)
 
     def rust_ingester(file_path: str):
         if not file_path.endswith(".rs"):
@@ -72,6 +74,28 @@ def _make_registry_for_rust():
     r.register_source_ingester(rust_ingester)
     r.register_graph_projector(rust_projector)
     return r
+
+
+def test_ingest_python_via_builtin(tmp_path):
+    """Wave 1: default Registry seeds PythonIngester; .py files are ingested."""
+    src = tmp_path / "repo"
+    src.mkdir()
+    py = src / "x.py"
+    py.write_text("def hello():\n    return 1\n")
+
+    registry = Registry()  # builtins on
+    pg = FakePostgres()
+    neo = FakeNeo4j()
+    # FakePostgres needs insert_doc_chunks too if routed as docs — python is code.
+    if not hasattr(pg, "insert_doc_chunks"):
+        pg.insert_doc_chunks = pg.insert_code_chunks  # type: ignore[attr-defined]
+    pipeline = IngestPipeline(registry, postgres=pg, neo4j=neo, embedder=FakeEmbedder(dim=8))
+
+    n_nodes, n_edges, n_chunks = pipeline.ingest_file(py, src)
+    assert n_chunks >= 1
+    assert pg.chunks
+    assert pg.chunks[0][0].file_path == "x.py"
+    assert pg.chunks[0][0].language == "python"
 
 
 def test_ingest_single_rust_file(tmp_path):
@@ -211,3 +235,20 @@ def test_ingest_tree_empty_globs_includes_everything(tmp_path):
     pipeline = IngestPipeline(registry, postgres=None, neo4j=neo, embedder=None)
     stats = pipeline.ingest_tree(src)
     assert stats.files_ingested == 2
+
+
+def test_glob_match_double_star_matches_zero_or_more_segments():
+    """`dir/**/*.md` must match both `dir/a.md` and `dir/sub/a.md`.
+
+    Plain fnmatch fails the single-segment case because `**` becomes
+    two `*` tokens that still require a `/` between them.
+    """
+    from kb_engine.ingest import _glob_match
+
+    assert _glob_match("decisions/ADR-0000-charter.md", "decisions/**/*.md")
+    assert _glob_match("decisions/nested/x.md", "decisions/**/*.md")
+    assert not _glob_match("other/ADR.md", "decisions/**/*.md")
+    assert _glob_match("vault/playbooks/governed-agent-memory.md", "vault/playbooks/**/*.md")
+    assert _glob_match("kb-engine/kb_engine/chunker.py", "kb-engine/**/*.py")
+    assert _glob_match(".cursor/scratchpad.md", ".cursor/**")
+    assert _glob_match("pkg/__pycache__/x.pyc", "**/__pycache__/**")

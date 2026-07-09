@@ -1,0 +1,12 @@
+id: agents-graphiti-hard-rule-2026-07-08
+category: graphiti-memory
+query: |
+  AGENTS.md hard rule: Never write to Graphiti directly — require vault
+  episodes plus the vault-sync daemon as the only Graphiti writer
+expected:
+  - AGENTS.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Policy-level graphiti-memory fixture; AGENTS.md is in sources.toml.

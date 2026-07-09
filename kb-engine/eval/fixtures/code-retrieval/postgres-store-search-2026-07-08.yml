@@ -1,0 +1,13 @@
+id: postgres-store-search-2026-07-08
+category: code-retrieval
+query: |
+  Where is PostgresStore.search_similar implemented for pgvector cosine
+  similarity over code_chunks in kb_engine/store/postgres.py?
+expected:
+  - kb-engine/kb_engine/store/postgres.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Self-contained fixture for the carve-out stack. Surfaces the PostgresStore
+  search_similar implementation.

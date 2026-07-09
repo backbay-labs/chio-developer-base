@@ -1,68 +1,64 @@
 # chio-pr-gate/
 
-> **Status:** placeholder. The gate lands in **Phase 2A** ([PLAN.md](../PLAN.md) Moonshot 1).
+Advisory PR-impact gate for chio-developer-base (Wave 5). Policy lives behind
+`ImpactPolicy`; default `ChioImpactPolicy` flags CANONICAL_DOC / GUARDS /
+IMPLEMENTS path patterns and honors `kb-gate: ack`.
 
-A GitHub Action that runs `kb_impact` and `kb_brief_feature` against every arc PR's diff and **fails the check** if downstream guards / conformance tests / policy compilers depend on the changed contract without being acknowledged in the PR body.
+**Status:** advisory-only. Blocking mode is deferred until a real
+follow-up-within-14d backtest meets P≥0.7 / R≥0.8.
 
-## Why this is Chio-specific
-
-Chio's failure mode is contract drift across the protocol/standards split. The graph already encodes this. Not using it at PR time is malpractice — the diagnostic surface is there, it just isn't wired to the merge gate.
-
-## Planned layout
+## Layout
 
 ```
 chio-pr-gate/
-├── action.yml                   GitHub Action entrypoint
-├── src/
-│   ├── gate.py                  diff → impacted-contract resolver
-│   ├── render.py                PR-comment markdown renderer
-│   └── policy.py                pass/fail rules (which edges fail; which warn)
-├── tests/
-│   ├── fixtures/                synthetic PRs for unit tests
-│   └── backtest/                last-50-PRs harness
-└── README.md
+├── action.yml          composite GitHub Action (local-runnable)
+├── pyproject.toml
+├── src/chio_pr_gate/
+│   ├── gate.py         CLI entry
+│   ├── policy.py       ImpactPolicy + ChioImpactPolicy
+│   ├── render.py       PR comment markdown
+│   └── backtest.py     synthetic (+ optional arc gh) P/R harness
+└── tests/
 ```
 
-## MVP shape (PLAN.md Moonshot 1)
+## Local run (composite-equivalent)
 
+```bash
+cd chio-pr-gate
+uv sync --group dev
+uv run --no-project pytest tests/ -q
+uv run --no-project python -m chio_pr_gate.gate \
+  --pr-body "" \
+  --changed-paths-json <(echo '["vault/spec/receipt-commitment.md"]') \
+  --advisory true
+
+# Backtest (synthetic + arc gh heuristic when available)
+uv run --no-project python -m chio_pr_gate.backtest \
+  --arc-repo ../../arc \
+  --limit 50 \
+  --out ../vault/_meta/dashboards/pr-gate-backtest.json
+# or: make kb-gate-backtest
 ```
-diff
-  → changed files
-  → kb_impact(file) for each high-risk file
-  → kb_brief_feature(symbol_or_path) per impacted contract
-  → render PR comment with: impacted suites, missing-test list, suggested ADRs
-  → check run pass/fail based on:
-       - any GUARDS / IMPLEMENTS edge crossed without test mention
-       - any CANONICAL_DOC node touched without `last-validated` bump
+
+## GitHub Action usage
+
+```yaml
+- uses: ./chio-pr-gate
+  with:
+    pr-body: ${{ github.event.pull_request.body }}
+    advisory: "true"
+    working-directory: chio-pr-gate
 ```
-
-## Eval target
-
-A new outcome eval `pr-impact-gate-precision-recall`. Backtest against the last 50 merged Chio PRs:
-
-- **Precision ≥ 0.7** — when the gate fires, the PR genuinely needed a follow-up within 14 days.
-- **Recall ≥ 0.8** — for PRs that needed a follow-up within 14 days, the gate fired.
-
-If the backtest falls below those thresholds, the gate ships **advisory-only** (warns, doesn't fail) until it earns its pass/fail authority. See PLAN.md "Open decisions / risks" item 5.
 
 ## Escape hatch
 
-Authors can override the gate by adding a marker to the PR body:
-
 ```
 kb-gate: ack
-> reason: revocation-window guard intentionally relaxed; ADR-0073
+> reason: …
 ```
 
-The `kb-gate: ack` marker is recognized by `gate.py` and converts a fail into a pass. The reason is required and is captured in the PR comment.
+## Eval
 
-## What does NOT belong here
-
-- Generic GitHub Action utilities. If they're reusable, they live in `kb-engine/` once productized.
-- Eval harness code. The backtest *fixtures* live here; the eval *runner* is `chio_pack.eval.runners.gate_backtest` per `outcomes.yml`.
-
-## See also
-
-- [PLAN.md](../PLAN.md#moonshot-1--pr-time-kb_impact-gate) — the moonshot design
-- [`chio-pack/eval/outcomes.yml`](../chio-pack/eval/outcomes.yml) — the deferred `pr-impact-gate-precision-recall` eval entry
-- [`chio-pack/eval/PHASE-0.md`](../chio-pack/eval/PHASE-0.md) — outcome eval framework
+`pr-impact-gate-precision-recall` stays **deferred** in `outcomes.yml` until
+ground-truth follow-up labels exist. Current backtest reports P/R honestly
+with `mode` + `note` fields.

@@ -169,8 +169,9 @@ class Registry:
     def register_builtin_ingesters(self) -> None:
         """Seed the kb-engine built-in source ingesters.
 
-        Registers `.py`, `.ts`/`.tsx`/`.js`/`.jsx`/`.mts`/`.cts`, and
-        `.md`/`.markdown`/`.mdx` chunkers from `kb_engine.ingesters`.
+        Registers `.py`, `.ts`/`.tsx`/`.js`/`.jsx`/`.mts`/`.cts`,
+        `.md`/`.markdown`/`.mdx`, and a generic text ingester that covers
+        Makefile / Dockerfile / .yml / .toml / .sh / .txt / .rst files.
         Idempotent — calling twice does not double-register.
 
         Builtins go on `_builtin_source_ingesters` (not the public
@@ -186,12 +187,14 @@ class Registry:
         from .ingesters import (  # noqa: PLC0415 — see docstring
             MarkdownIngester,
             PythonIngester,
+            TextIngester,
             TypescriptIngester,
         )
         self._builtin_source_ingesters.extend([
             PythonIngester(),
             TypescriptIngester(),
             MarkdownIngester(),
+            TextIngester(),
         ])
 
     def clear_builtin_ingesters(self) -> None:

@@ -1,0 +1,12 @@
+id: policy-compiler-spec-2026-07-08
+category: docs-spec-retrieval
+query: |
+  Where is the policy-compiler spec that lowers a Chio ImpactPolicy
+  predicate to graph matchers and evaluated receipts?
+expected:
+  - vault/spec/policy-compiler.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Underpins Wave 5 Graph-Compiled Guards shadow track.

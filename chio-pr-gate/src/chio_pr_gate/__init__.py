@@ -1,0 +1,1 @@
+"""Advisory PR-impact gate."""

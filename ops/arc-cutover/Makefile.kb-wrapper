@@ -1,0 +1,18 @@
+# Drop-in Arc Makefile fragment for Wave 3 KB_DIR cutover.
+#
+# Include from arc/Makefile after setting:
+#   KB_DIR ?= ../chio-developer-base
+#
+# This preserves Arc's `make kb-*` command surface while delegating execution to
+# chio-developer-base, where the KB stack now lives.
+
+KB_DIR ?= ../chio-developer-base
+KB_MAKE ?= $(MAKE) -C $(KB_DIR) ARC_REPO=$(CURDIR)
+
+.PHONY: kb-lock-check kb-up kb-down kb-reset kb-reseed kb-update kb-live kb-status kb-smoke kb-eval kb-seed-memory kb-dogfood
+
+kb-up kb-down kb-reset kb-reseed kb-update kb-live kb-status kb-smoke kb-eval kb-seed-memory kb-dogfood:
+	$(KB_MAKE) $@
+
+kb-lock-check:
+	cd $(KB_DIR)/chio-pack && uv lock --check

@@ -1,0 +1,51 @@
+name: "Chio KB PR Impact Gate"
+description: "Advisory check that comments on likely impacted guards, docs, and tests."
+inputs:
+  pr-body:
+    description: "Pull request body markdown"
+    required: false
+    default: ""
+  changed-paths-json:
+    description: "Optional JSON file of changed paths (list or {changed_paths:[...]})"
+    required: false
+    default: ""
+  advisory:
+    description: "Run advisory-only. Blocking mode is future work."
+    required: false
+    default: "true"
+  working-directory:
+    description: "Directory containing the chio-pr-gate package"
+    required: false
+    default: "chio-pr-gate"
+runs:
+  using: "composite"
+  steps:
+    - name: Install advisory gate package
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        if command -v uv >/dev/null 2>&1; then
+          uv sync --no-install-project 2>/dev/null || true
+          uv pip install -e . --quiet
+        else
+          python3 -m pip install -e . --quiet
+        fi
+    - name: Run advisory KB gate
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        PR_BODY: ${{ inputs.pr-body }}
+        ADVISORY: ${{ inputs.advisory }}
+        CHANGED_PATHS_JSON: ${{ inputs.changed-paths-json }}
+      run: |
+        set -euo pipefail
+        args=(--pr-body "${PR_BODY}" --advisory "${ADVISORY}")
+        if [[ -n "${CHANGED_PATHS_JSON}" ]]; then
+          args+=(--changed-paths-json "${CHANGED_PATHS_JSON}")
+        fi
+        if command -v uv >/dev/null 2>&1; then
+          uv run --no-project python -m chio_pr_gate.gate "${args[@]}"
+        else
+          PYTHONPATH=src python3 -m chio_pr_gate.gate "${args[@]}"
+        fi

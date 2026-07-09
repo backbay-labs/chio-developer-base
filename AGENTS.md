@@ -50,4 +50,4 @@ This repo lives at `/Users/connor/Medica/backbay/standalone/chio-developer-base/
 
 - PR #599 `codex/chio-kb-a-grade-dogfood` — the origin stack. Will be replaced by a thin Make wrapper or submodule reference once Phase 1 lands.
 - arc's `tests/conformance/` — source of truth for SDK conformance fixtures used by the `conformance-harness-recall` outcome eval.
-- arc's `crates/chio-receipts/` — used by signed-retrieval verification (Phase 2).
+- arc's `crates/core/chio-core-types/` (receipt types) and `crates/sdk/chio-eval-receipt/` (bundle verifier) — used by signed-retrieval verification (Phase 2B). There is no `crates/chio-receipts/` crate.

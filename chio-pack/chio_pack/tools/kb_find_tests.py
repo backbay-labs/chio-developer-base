@@ -1,11 +1,9 @@
-"""kb_find_tests — find tests related to a path, crate, symbol, or concept.
-
-Phase 1.3+ traverses the GUARDS / IMPLEMENTS / TESTS edges in Neo4j.
-Today: stub.
-"""
+"""kb_find_tests — find tests related to a path, crate, symbol, or concept."""
 from __future__ import annotations
 
 from typing import Any
+
+from . import kb_search_code
 
 NAME = "kb_find_tests"
 
@@ -27,13 +25,25 @@ def call(arguments: dict[str, Any]) -> dict[str, Any]:
             "status": "error",
             "reason": "missing required argument: path_or_symbol",
         }
+    path = arguments["path_or_symbol"]
+    limit = int(arguments.get("limit", 12))
+    search = kb_search_code.call(
+        {
+            "query": f"tests for {path}",
+            "limit": limit,
+            "filters": {"path_contains": "test"},
+        }
+    )
+    results = [
+        r for r in search.get("results", [])
+        if "test" in str(r.get("file_path", "")).lower()
+        or path.split("/")[-1].split(".")[0] in str(r.get("file_path", ""))
+    ]
+    if not results:
+        results = search.get("results", [])
     return {
-        "status": "stub",
-        "reason": "Phase 1.3+: Neo4j TESTS edge traversal not yet wired",
+        "status": "ok" if search.get("status") == "ok" else search.get("status", "error"),
         "tool": NAME,
-        "echo": {
-            "path_or_symbol": arguments["path_or_symbol"],
-            "limit": arguments.get("limit", 12),
-        },
-        "results": [],
+        "results": results[:limit],
+        "reason": search.get("reason"),
     }

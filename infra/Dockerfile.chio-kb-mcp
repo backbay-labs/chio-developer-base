@@ -1,34 +1,32 @@
-# chio-kb-mcp gateway. Phase 1.1 build context.
+# chio-kb-mcp gateway. Wave 1 / Phase 1.3 build context.
 #
-# Today: builds an image with kb-engine + chio-pack installed. The actual
-# MCP server (the 10 kb_* tools, ranking, signed-retrieval envelope) is
-# Phase 1.3+. For Phase 1.1, the container runs a tiny stub server that
-# responds 200 on /health so `make kb-up` can verify the compose stack
-# brings up cleanly end-to-end.
+# Builds an image with kb-engine + chio-pack installed and runs the real
+# MCP gateway (infra/chio-kb-mcp-server.py) hosting the 10 kb_* tools.
 #
-# Build context is the REPO ROOT (..) — see docker-compose.yml. That lets
-# us copy both kb-engine/ and chio-pack/ into the image.
+# Build context is the REPO ROOT (..) — see docker-compose.yml.
 
 FROM python:3.11-slim
 
-# System deps for graph/db clients (pinned light)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv (Astral's package manager) — chio-pack uses it
 RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 
-# Copy the two installable packages, install both
 COPY kb-engine/ /app/kb-engine/
 COPY chio-pack/ /app/chio-pack/
-RUN uv pip install --system --no-cache /app/kb-engine /app/chio-pack
+RUN uv pip install --system --no-cache "/app/kb-engine[all]" /app/chio-pack
 
-# Phase 1.1 health-stub server. Replaced by the real chio-kb-mcp Phase 1.3+.
-COPY infra/chio-kb-mcp-stub.py /app/server.py
+# Real MCP gateway (Wave 1). Replaces the Phase 1.1 health stub.
+COPY infra/chio-kb-mcp-server.py /app/server.py
+
+# Retrieval fixtures + eval entrypoint for `make kb-eval-retrieval`.
+COPY kb-engine/eval/ /app/kb-engine/eval/
+COPY chio-pack/eval/ /app/chio-pack/eval/
+COPY vault/ /vault/
 
 EXPOSE 8111
 CMD ["python", "/app/server.py"]

@@ -1,0 +1,14 @@
+id: plugin-registry-load-2026-07-08
+category: code-retrieval
+query: |
+  Where does the engine load pack plugins from Python entry points and
+  register their hooks against the Registry?
+expected:
+  - kb-engine/kb_engine/plugin.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Registry.load_entry_points() is the boundary point that lets a pack
+  cross into the engine without kb_engine importing chio_*. Wave 1
+  retrieval must find this without a graph hop.

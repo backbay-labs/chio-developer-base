@@ -1,7 +1,4 @@
-"""kb_neighbors — return nearby Neo4j knowledge-graph entities.
-
-Phase 1.3+ runs a depth-bounded BFS in Neo4j. Today: stub.
-"""
+"""kb_neighbors — return nearby Neo4j knowledge-graph entities."""
 from __future__ import annotations
 
 from typing import Any
@@ -24,14 +21,17 @@ INPUT_SCHEMA: dict[str, Any] = {
 def call(arguments: dict[str, Any]) -> dict[str, Any]:
     if "entity" not in arguments:
         return {"status": "error", "reason": "missing required argument: entity"}
+    from chio_pack.runtime import get_runtime
+
+    rt = get_runtime()
+    depth = int(arguments.get("depth", 2))
+    limit = int(arguments.get("limit", 50))
+    neighbors = rt.neighbors(arguments["entity"], depth=depth, limit=limit)
     return {
-        "status": "stub",
-        "reason": "Phase 1.3+: Neo4j BFS not yet wired",
+        "status": "ok",
         "tool": NAME,
-        "echo": {
-            "entity": arguments["entity"],
-            "depth": arguments.get("depth", 2),
-            "limit": arguments.get("limit", 50),
-        },
-        "neighbors": [],
+        "entity": arguments["entity"],
+        "depth": depth,
+        "limit": limit,
+        "neighbors": neighbors,
     }

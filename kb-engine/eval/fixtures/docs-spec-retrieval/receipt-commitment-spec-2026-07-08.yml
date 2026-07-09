@@ -1,0 +1,13 @@
+id: receipt-commitment-spec-2026-07-08
+category: docs-spec-retrieval
+query: |
+  Where is the receipt-commitment spec that defines how a retrieval
+  response is committed to a Merkle-anchored transcript and verified
+  against chio-core-types?
+expected:
+  - vault/spec/receipt-commitment.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Spec vault entry consumed by Wave 4 signed-retrieval work.

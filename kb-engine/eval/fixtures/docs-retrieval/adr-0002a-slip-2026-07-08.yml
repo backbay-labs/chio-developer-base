@@ -1,0 +1,11 @@
+id: adr-0002a-slip-2026-07-08
+category: docs-retrieval
+query: |
+  Why did Phase 0 baselines slip and what is the new credibility floor deadline?
+expected:
+  - decisions/ADR-0002a-phase-0-slip.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Wave 0 governance ADR documenting the Phase 0 slip.

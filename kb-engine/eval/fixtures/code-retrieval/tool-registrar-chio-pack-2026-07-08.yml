@@ -1,0 +1,12 @@
+id: tool-registrar-chio-pack-2026-07-08
+category: code-retrieval
+query: |
+  chio-pack/chio_pack/plugin.py — chio_tool_registrar register_tool for
+  the 10 kb_* MCP tools (name, description, input_schema, call)
+expected:
+  - chio-pack/chio_pack/plugin.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  chio_tool_registrar is the ToolRegistrar plugin hook implementation.

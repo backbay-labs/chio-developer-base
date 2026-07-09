@@ -1,0 +1,12 @@
+id: protocol-wire-format-spec-2026-07-08
+category: docs-spec-retrieval
+query: |
+  Where is the Chio protocol wire-format spec that documents the
+  request and response envelope shape between SDK, gateway, and peers?
+expected:
+  - vault/spec/protocol-wire-format.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Wire format that the KB conformance peer must not silently break.

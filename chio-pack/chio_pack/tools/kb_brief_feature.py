@@ -1,12 +1,9 @@
-"""kb_brief_feature — agent editing brief: code, docs, tests, graph impact, memory, validation cmds.
-
-Phase 1.3+ blends ``kb_search_code``, ``kb_find_docs``, ``kb_impact``,
-and the temporal-memory query into a single agent-readable brief.
-Today: stub.
-"""
+"""kb_brief_feature — agent editing brief from live retrieval tools."""
 from __future__ import annotations
 
 from typing import Any
+
+from . import kb_find_docs, kb_find_tests, kb_impact, kb_search_code
 
 NAME = "kb_brief_feature"
 
@@ -50,20 +47,36 @@ def call(arguments: dict[str, Any]) -> dict[str, Any]:
             "status": "error",
             "reason": "missing required argument: feature_or_task",
         }
+    query = str(arguments["feature_or_task"])
+    limit = int(arguments.get("limit", 8))
+    code = kb_search_code.call({"query": query, "limit": limit})
+    docs = kb_find_docs.call({"path_or_crate": query, "limit": limit})
+    tests = kb_find_tests.call({"path_or_symbol": query, "limit": limit})
+    impact = kb_impact.call({"path_or_crate": query, "limit": limit})
+    status = "ok"
+    if any(r.get("status") == "error" for r in (code, docs, tests, impact)):
+        status = "error"
     return {
-        "status": "stub",
-        "reason": "Phase 1.3+: brief composer not yet wired",
+        "status": status,
         "tool": NAME,
         "echo": {
-            "feature_or_task": arguments["feature_or_task"],
+            "feature_or_task": query,
             "focus_paths": arguments.get("focus_paths") or [],
-            "limit": arguments.get("limit", 8),
+            "limit": limit,
             "include_memory": arguments.get("include_memory", True),
             "intent": arguments.get("intent", "auto"),
         },
-        "code": [],
-        "docs": [],
-        "tests": [],
+        "code": code.get("results", []),
+        "docs": docs.get("results", []),
+        "tests": tests.get("results", []),
+        "impact": {
+            "components": impact.get("components", []),
+            "tests": impact.get("tests", []),
+            "docs": impact.get("docs", []),
+        },
         "memory": [],
-        "validation_commands": [],
+        "validation_commands": [
+            "make check-boundary",
+            "make kb-eval-retrieval",
+        ],
     }

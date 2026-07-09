@@ -1,0 +1,12 @@
+id: adr-0005-signed-retrieval-2026-07-08
+category: docs-retrieval
+query: |
+  What ADR governs adding the signed-retrieval outcome eval category
+  and the DevSelfSigned receipt path?
+expected:
+  - decisions/ADR-0005-signed-retrieval-eval.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  AGENTS.md hard rule #6: no new outcome eval without an ADR.

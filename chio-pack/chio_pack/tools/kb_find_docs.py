@@ -1,10 +1,9 @@
-"""kb_find_docs — find docs related to a path, crate, symbol, or concept.
-
-Phase 1.3+ traverses CANONICAL_DOC / DESCRIBES edges. Today: stub.
-"""
+"""kb_find_docs — find docs related to a path, crate, symbol, or concept."""
 from __future__ import annotations
 
 from typing import Any
+
+from . import kb_search_docs
 
 NAME = "kb_find_docs"
 
@@ -26,13 +25,16 @@ def call(arguments: dict[str, Any]) -> dict[str, Any]:
             "status": "error",
             "reason": "missing required argument: path_or_crate",
         }
-    return {
-        "status": "stub",
-        "reason": "Phase 1.3+: Neo4j CANONICAL_DOC traversal not yet wired",
-        "tool": NAME,
-        "echo": {
-            "path_or_crate": arguments["path_or_crate"],
+    path = arguments["path_or_crate"]
+    result = kb_search_docs.call(
+        {
+            "query": path,
             "limit": arguments.get("limit", 12),
-        },
-        "results": [],
+        }
+    )
+    result["tool"] = NAME
+    result["echo"] = {
+        "path_or_crate": path,
+        "limit": arguments.get("limit", 12),
     }
+    return result

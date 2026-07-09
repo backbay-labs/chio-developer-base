@@ -1,0 +1,14 @@
+id: chio-tool-registrar-bridge-2026-07-08
+category: graph-and-bridge
+query: |
+  Where does chio-pack register the kb_* MCP tools onto the engine
+  plugin Registry via chio_tool_registrar so the gateway can bridge
+  tool calls into pack implementations?
+expected:
+  - chio-pack/chio_pack/plugin.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Engine↔pack tool-registration bridge; complements the MCP HTTP
+  gateway fixture in the same category.

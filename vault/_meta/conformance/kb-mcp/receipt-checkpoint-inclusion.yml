@@ -1,0 +1,14 @@
+id: kb-mcp.receipt-checkpoint-inclusion
+peer: kb-mcp
+status: draft
+tool: kb_search_code
+assertions:
+  - response.receipt.response_hash exists
+  - response.receipt.index_snapshot exists
+  - response.receipt.signature exists
+  - response.receipt.parent_receipt_hash is accepted when present
+  - chio-dev verify / verify_response passes for original response
+  - verify_response fails after mutating response.results[0]
+runner: ops/ci/run_kb_peer_cell.py
+pytest: vault/_meta/conformance/kb-mcp/test_receipt_checkpoint_cell.py
+arc_followup: tests/conformance/peers/kb-mcp/ (requires arc PR; dual-CI not done)

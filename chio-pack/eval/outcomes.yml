@@ -71,17 +71,25 @@ evals:
 
 # Phase 2 evals — declared here so a Phase 1 contributor cannot quietly skip
 # the gate. Runner attempts before `blocked_until` is reached fail loudly.
+#
+# Wave 4 P0 fix (2026-07-08): `signed-retrieval` was incorrectly listed under
+# active `evals:` while neither `chio_pack.eval.runners.signed_retrieval` nor
+# `fixtures/signed-retrieval/` existed. ADR-0005 authorizes the eval; it must
+# stay deferred until the runner + fixtures land and ADR acceptance boxes are
+# checked. Offline verify+tamper is already proven via `chio-dev verify`.
 deferred:
   - id: signed-retrieval
-    blocked_until: phase-2b
-    note: "Requires kb-engine/kb_engine/receipt/envelope.py — see PLAN.md Moonshot 2."
+    blocked_until: phase-2b-runner
+    adr: ../../decisions/ADR-0005-signed-retrieval-eval.md
+    note: >
+      ADR-0005 filed. DevSelfSigned verify+tamper works via chio-dev verify.
+      Promote to active evals only after runner module + fixtures exist.
     target_when_unblocked:
-      metric: verifiable_fraction
-      absolute: 1.0                        # binary: every response carries a verifiable receipt
-
+      verifiable_fraction: 1.0
+      tamper_rejection_fraction: 1.0
   - id: pr-impact-gate-precision-recall
     blocked_until: phase-2a
-    note: "Requires chio-pr-gate/ — see PLAN.md Moonshot 1."
+    note: "Requires chio-pr-gate/ — see PLAN.md Moonshot 1. Wave 5 advisory gate + synthetic backtest landed; real 50-PR arc replay still pending."
     target_when_unblocked:
       precision: 0.70
       recall:    0.80

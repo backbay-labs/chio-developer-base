@@ -1,0 +1,13 @@
+id: vault-sync-watcher-2026-07-08
+category: code-retrieval
+query: |
+  Where does the vault-sync daemon process filesystem create, modify,
+  delete, and move events from watchdog into Graphiti-bound derived
+  records with tombstones?
+expected:
+  - kb-engine/kb_engine/sync.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Vault-sync is the only writer to Graphiti (AGENTS.md hard rule #1).

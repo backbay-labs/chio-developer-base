@@ -1,0 +1,12 @@
+id: vault-sync-graphiti-bridge-2026-07-08
+category: graph-and-bridge
+query: |
+  kb_engine/sync.py vault-to-Graphiti bridge — DerivedRecord Router that
+  watches vault markdown and is the only Graphiti writer with tombstones
+expected:
+  - kb-engine/kb_engine/sync.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  AGENTS.md hard rule #1: vault-sync daemon is the sole Graphiti writer.

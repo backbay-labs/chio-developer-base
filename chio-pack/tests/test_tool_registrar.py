@@ -1,11 +1,11 @@
-"""Tests for ``chio_tool_registrar`` and the 10 ``kb_*`` tools.
+"""Tests for ``chio_tool_registrar`` and the ``kb_*`` tools.
 
 These prove the engine ↔ pack boundary holds end-to-end:
 
   - The :class:`Registry` (from kb-engine) accepts a duck-typed
     ``server`` and dispatches all registrars against it.
   - chio-pack's ``chio_tool_registrar`` populates ``server.tools`` with
-    exactly the 10 names listed in AGENTS.md.
+    the canonical 10 names listed in AGENTS.md plus Wave 6 memory tools.
   - Every registered tool is callable and returns a structured response
     (the Phase 1.3 stubs return ``{"status": "stub", ...}`` — that's
     fine; the contract is what's tested).
@@ -25,7 +25,7 @@ from chio_pack import plugin
 from chio_pack.tools import ALL_NAMES, ALL_TOOLS
 from chio_pack.tools.fake_server import FakeServer
 
-# Canonical list straight from AGENTS.md "The 10 MCP tools".
+# Canonical 10 from AGENTS.md plus Wave 6 governed-memory tools.
 EXPECTED_NAMES = {
     "kb_search_code",
     "kb_search_docs",
@@ -37,22 +37,25 @@ EXPECTED_NAMES = {
     "kb_brief_feature",
     "kb_eval",
     "kb_add_episode",
+    "kb_memory_add",
+    "kb_memory_query",
+    "kb_memory_revoke",
 }
 
 
 def test_all_names_match_agents_md_canonical_list():
     assert set(ALL_NAMES) == EXPECTED_NAMES
-    assert len(ALL_NAMES) == 10
+    assert len(ALL_NAMES) == 13
 
 
-def test_registry_register_tools_populates_all_ten_names():
+def test_registry_register_tools_populates_all_expected_names():
     """End-to-end: Registry → chio_tool_registrar → server.tools."""
     server = FakeServer()
     r = Registry()
     plugin.register(r)
     r.register_tools(server)
     assert set(server.tools) == EXPECTED_NAMES
-    assert len(server.tools) == 10
+    assert len(server.tools) == 13
 
 
 def test_chio_tool_registrar_direct_invocation():
@@ -94,23 +97,31 @@ def test_each_registered_tool_has_required_metadata():
         assert callable(t.call)
 
 
-def test_each_registered_tool_is_callable_and_returns_structured_response():
+def test_each_registered_tool_is_callable_and_returns_structured_response(tmp_path, monkeypatch):
     """Every tool is invokable and returns a dict with at least
     ``status`` and ``tool``. Stubs return ``status: stub``; real
     implementations (Phase 1.3+) will return ``status: ok``."""
     server = FakeServer()
     plugin.chio_tool_registrar(server)
+    repo = tmp_path / "repo"
+    (repo / "vault" / "episodes").mkdir(parents=True)
+    (repo / "PLAN.md").write_text("plan", encoding="utf-8")
+    (repo / "Makefile").write_text("help:\n", encoding="utf-8")
+    monkeypatch.setenv("CHIO_DEV_REPO", str(repo))
     sample_args: dict[str, dict[str, Any]] = {
         "kb_search_code": {"query": "capability revocation"},
         "kb_search_docs": {"query": "receipt commitment"},
-        "kb_find_tests": {"path_or_symbol": "crates/chio-receipts/src/lib.rs"},
-        "kb_find_docs": {"path_or_crate": "chio-receipts"},
+        "kb_find_tests": {"path_or_symbol": "crates/core/chio-core-types/src/receipt/mod.rs"},
+        "kb_find_docs": {"path_or_crate": "chio-core-types"},
         "kb_neighbors": {"entity": "ChioCapability:revocation"},
         "kb_context": {"entity": "ChioCapability:revocation"},
-        "kb_impact": {"path_or_crate": "crates/chio-receipts/"},
+        "kb_impact": {"path_or_crate": "crates/core/chio-core-types/"},
         "kb_brief_feature": {"feature_or_task": "wire receipt verification"},
         "kb_eval": {},
         "kb_add_episode": {"name": "Demo episode", "body": "hello"},
+        "kb_memory_add": {"text": "remember this", "session_id": "test"},
+        "kb_memory_query": {"query": "remember"},
+        "kb_memory_revoke": {"memory_id": "memory.test.demo", "reason": "test"},
     }
     for name in EXPECTED_NAMES:
         result = server.call_tool(name, sample_args[name])
@@ -136,6 +147,10 @@ def test_required_argument_validation_returns_error_not_raises():
     assert "query" in out["reason"]
     # kb_add_episode requires both name and body
     out = server.call_tool("kb_add_episode", {"name": "x"})
+    assert out["status"] == "error"
+    out = server.call_tool("kb_memory_add", {})
+    assert out["status"] == "error"
+    out = server.call_tool("kb_memory_revoke", {"memory_id": "memory.x"})
     assert out["status"] == "error"
 
 
@@ -190,9 +205,9 @@ def test_engine_does_not_import_chio_tools():
         assert not bad, f"{module.__name__} imports chio_*: {bad}"
 
 
-def test_all_tools_tuple_order_is_canonical_agents_md_order():
-    """AGENTS.md lists tools in a specific order; ALL_TOOLS preserves
-    it so generated docs / dashboards stay stable."""
+def test_all_tools_tuple_order_preserves_canonical_ten_then_memory():
+    """AGENTS.md lists the first 10 in a specific order; Wave 6 memory
+    tools are appended so generated docs / dashboards stay stable."""
     canonical_order = [
         "kb_search_code",
         "kb_search_docs",
@@ -204,6 +219,9 @@ def test_all_tools_tuple_order_is_canonical_agents_md_order():
         "kb_brief_feature",
         "kb_eval",
         "kb_add_episode",
+        "kb_memory_add",
+        "kb_memory_query",
+        "kb_memory_revoke",
     ]
     assert [t.NAME for t in ALL_TOOLS] == canonical_order
 
@@ -223,6 +241,9 @@ def test_input_schemas_declare_required_fields_correctly():
         "kb_impact": ["path_or_crate"],
         "kb_brief_feature": ["feature_or_task"],
         "kb_add_episode": ["name", "body"],
+        "kb_memory_add": ["text"],
+        "kb_memory_query": ["query"],
+        "kb_memory_revoke": ["memory_id", "reason"],
     }
     for name, required in cases.items():
         schema = server.tools[name].input_schema

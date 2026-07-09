@@ -1,0 +1,12 @@
+id: boundary-check-script-2026-07-08
+category: operations
+query: |
+  ops/ci/check-imports.py — CI script enforcing kb_engine cannot import
+  chio_* and packs cannot import each other
+expected:
+  - ops/ci/check-imports.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  AGENTS.md hard rule #3 enforcement.

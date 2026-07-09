@@ -182,10 +182,20 @@ def load_sources_toml(
                 f"{path}: [[source]] #{i} root {root} does not exist"
             )
 
-        glob = entry.get("glob", [])
+        # Accept `include` as a documented alias for `glob` (common typo /
+        # sources.toml draft key). Prefer `glob` when both are present.
+        if "glob" in entry:
+            glob = entry.get("glob", [])
+            glob_key = "glob"
+        elif "include" in entry:
+            glob = entry.get("include", [])
+            glob_key = "include"
+        else:
+            glob = []
+            glob_key = "glob"
         if not isinstance(glob, list) or not all(isinstance(g, str) for g in glob):
             raise ConfigError(
-                f"{path}: [[source]] #{i} `glob` must be a list of strings"
+                f"{path}: [[source]] #{i} `{glob_key}` must be a list of strings"
             )
         exclude = entry.get("exclude", [])
         if not isinstance(exclude, list) or not all(isinstance(g, str) for g in exclude):

@@ -1,8 +1,4 @@
-"""kb_context — 360-degree incoming/outgoing graph view for one entity.
-
-Phase 1.3+ unions BFS in both directions and joins doc/test refs.
-Today: stub.
-"""
+"""kb_context — 360-degree incoming/outgoing graph view for one entity."""
 from __future__ import annotations
 
 from typing import Any
@@ -24,14 +20,16 @@ INPUT_SCHEMA: dict[str, Any] = {
 def call(arguments: dict[str, Any]) -> dict[str, Any]:
     if "entity" not in arguments:
         return {"status": "error", "reason": "missing required argument: entity"}
+    from chio_pack.runtime import get_runtime
+
+    rt = get_runtime()
+    limit = int(arguments.get("limit", 50))
+    neighbors = rt.neighbors(str(arguments["entity"]), depth=1, limit=limit)
     return {
-        "status": "stub",
-        "reason": "Phase 1.3+: bidirectional Neo4j traversal not yet wired",
+        "status": "ok",
         "tool": NAME,
-        "echo": {
-            "entity": arguments["entity"],
-            "limit": arguments.get("limit", 50),
-        },
-        "incoming": [],
-        "outgoing": [],
+        "entity": arguments["entity"],
+        "incoming": neighbors,
+        "outgoing": neighbors,
+        "rank_components": {"graph_bfs": 1.0},
     }

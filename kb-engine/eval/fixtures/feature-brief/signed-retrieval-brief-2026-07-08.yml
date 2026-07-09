@@ -1,0 +1,13 @@
+id: signed-retrieval-brief-2026-07-08
+category: feature-brief
+query: |
+  ADR-0005-signed-retrieval-eval.md — Feature brief for self-evidencing
+  signed RetrievalReceipt eval contract and Phase 2B verification path
+expected:
+  - decisions/ADR-0005-signed-retrieval-eval.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Compound feature-brief shape (docs + decision) for Wave 4A signed
+  retrieval; expected path is in sources.toml decisions/**.

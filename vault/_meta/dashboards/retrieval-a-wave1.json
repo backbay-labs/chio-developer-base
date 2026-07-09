@@ -1,0 +1,630 @@
+{
+  "status": "ok",
+  "grade": "A",
+  "metrics": {
+    "fixture_count": 38,
+    "mean_p_at_5": 1.0,
+    "mean_mrr": 1.0,
+    "categories": {
+      "code-retrieval": "A",
+      "docs-retrieval": "A",
+      "docs-spec-retrieval": "A",
+      "feature-brief": "A",
+      "graph-and-bridge": "A",
+      "graph-navigation-impact": "A",
+      "graphiti-memory": "A",
+      "operations": "A",
+      "test-discovery": "A"
+    }
+  },
+  "results": [
+    {
+      "id": "chio-dev-init-pack-cli-2026-07-08",
+      "category": "code-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "chio-pack/chio_pack/cli.py",
+        "chio-pack/chio_pack/scaffold.py",
+        "chio-pack/tests/test_scaffold.py",
+        "chio-pack/chio_pack/__init__.py",
+        "chio-pack/tests/test_plugin.py"
+      ],
+      "expected": [
+        "chio-pack/chio_pack/cli.py"
+      ]
+    },
+    {
+      "id": "chunker-split-2026-07-08",
+      "category": "code-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "kb-engine/kb_engine/chunker.py",
+        "kb-engine/kb_engine/ingesters/text.py",
+        "kb-engine/kb_engine/ingesters/_common.py",
+        "kb-engine/kb_engine/ingesters/markdown.py",
+        "kb-engine/kb_engine/ingesters/typescript.py"
+      ],
+      "expected": [
+        "kb-engine/kb_engine/chunker.py"
+      ]
+    },
+    {
+      "id": "kb-memory-add-tool-2026-07-08",
+      "category": "code-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "chio-pack/chio_pack/tools/kb_memory_add.py",
+        "chio-pack/chio_pack/memory.py",
+        "chio-pack/chio_pack/tools/kb_add_episode.py",
+        "chio-pack/chio_pack/tools/kb_memory_revoke.py",
+        "chio-pack/chio_pack/tools/kb_memory_query.py"
+      ],
+      "expected": [
+        "chio-pack/chio_pack/tools/kb_memory_add.py"
+      ]
+    },
+    {
+      "id": "mcp-gateway-server-2026-07-08",
+      "category": "code-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "infra/chio-kb-mcp-server.py",
+        "chio-pack/chio_pack/smoke.py",
+        "chio-pack/chio_pack/tools/fake_server.py",
+        "kb-engine/kb_engine/plugin.py",
+        "chio-pack/chio_pack/mcp_gateway.py"
+      ],
+      "expected": [
+        "infra/chio-kb-mcp-server.py"
+      ]
+    },
+    {
+      "id": "plugin-registry-load-2026-07-08",
+      "category": "code-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "kb-engine/kb_engine/plugin.py",
+        "chio-pack/chio_pack/plugin.py",
+        "ops/ci/smoke-second-pack.sh",
+        "chio-pack/chio_pack/scaffold.py",
+        "ops/ci/check-imports.py"
+      ],
+      "expected": [
+        "kb-engine/kb_engine/plugin.py"
+      ]
+    },
+    {
+      "id": "postgres-store-search-2026-07-08",
+      "category": "code-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "kb-engine/kb_engine/store/postgres.py",
+        "kb-engine/kb_engine/store/vector.py",
+        "kb-engine/kb_engine/store/turbovec.py",
+        "chio-pack/chio_pack/tools/kb_search_code.py",
+        "chio-pack/chio_pack/cli.py"
+      ],
+      "expected": [
+        "kb-engine/kb_engine/store/postgres.py"
+      ]
+    },
+    {
+      "id": "retrieval-receipt-envelope-2026-07-08",
+      "category": "code-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "kb-engine/kb_engine/receipt/envelope.py",
+        "chio-pack/chio_pack/eval/retrieval.py",
+        "kb-engine/kb_engine/receipt/dev_signer.py",
+        "kb-engine/kb_engine/receipt/__init__.py",
+        "kb-engine/kb_engine/types.py"
+      ],
+      "expected": [
+        "kb-engine/kb_engine/receipt/envelope.py"
+      ]
+    },
+    {
+      "id": "tool-registrar-chio-pack-2026-07-08",
+      "category": "code-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "chio-pack/chio_pack/plugin.py",
+        "chio-pack/chio_pack/schema.py",
+        "chio-pack/chio_pack/tools/fake_server.py",
+        "infra/chio-kb-mcp-server.py",
+        "chio-pack/chio_pack/tools/__init__.py"
+      ],
+      "expected": [
+        "chio-pack/chio_pack/plugin.py"
+      ]
+    },
+    {
+      "id": "vault-sync-watcher-2026-07-08",
+      "category": "code-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "kb-engine/kb_engine/sync.py",
+        "chio-pack/chio_pack/cli.py",
+        "kb-engine/tests/test_sync.py",
+        "ops/scripts/migrate-seeds.py",
+        "kb-engine/kb_engine/types.py"
+      ],
+      "expected": [
+        "kb-engine/kb_engine/sync.py"
+      ]
+    },
+    {
+      "id": "vector-store-protocol-2026-07-08",
+      "category": "code-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "kb-engine/kb_engine/store/vector.py",
+        "kb-engine/kb_engine/store/turbovec.py",
+        "kb-engine/kb_engine/store/postgres.py",
+        "chio-pack/chio_pack/bench/dual_index.py",
+        "kb-engine/kb_engine/store/__init__.py"
+      ],
+      "expected": [
+        "kb-engine/kb_engine/store/vector.py"
+      ]
+    },
+    {
+      "id": "adr-0000-charter-2026-07-08",
+      "category": "docs-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "decisions/ADR-0000-charter.md",
+        "vault/playbooks/adopt-chio-developer-base.md",
+        "vault/playbooks/onboard-a-chio-developer.md",
+        "decisions/ADR-0002-phase-0-baselines.md",
+        "decisions/ADR-0001-repo-graduation.md"
+      ],
+      "expected": [
+        "decisions/ADR-0000-charter.md"
+      ]
+    },
+    {
+      "id": "adr-0002a-slip-2026-07-08",
+      "category": "docs-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "decisions/ADR-0002a-phase-0-slip.md",
+        "decisions/ADR-0002-phase-0-baselines.md",
+        "decisions/ADR-0004-rater-pool.md",
+        "vault/playbooks/adopt-chio-developer-base.md",
+        "vault/playbooks/release-qualification.md"
+      ],
+      "expected": [
+        "decisions/ADR-0002a-phase-0-slip.md"
+      ]
+    },
+    {
+      "id": "adr-0005-signed-retrieval-2026-07-08",
+      "category": "docs-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "decisions/ADR-0005-signed-retrieval-eval.md",
+        "decisions/ADR-0000-charter.md",
+        "vault/playbooks/release-qualification.md",
+        "decisions/ADR-0004-rater-pool.md",
+        "vault/spec/receipt-commitment.md"
+      ],
+      "expected": [
+        "decisions/ADR-0005-signed-retrieval-eval.md"
+      ]
+    },
+    {
+      "id": "agents-hard-rules-2026-07-08",
+      "category": "docs-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "AGENTS.md",
+        "vault/playbooks/onboard-a-chio-developer.md",
+        "vault/playbooks/governed-agent-memory.md",
+        "vault/playbooks/adopt-chio-developer-base.md",
+        "PLAN.md"
+      ],
+      "expected": [
+        "AGENTS.md"
+      ]
+    },
+    {
+      "id": "governed-agent-memory-playbook-2026-07-08",
+      "category": "docs-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "vault/playbooks/governed-agent-memory.md",
+        "vault/playbooks/revoke-a-capability.md",
+        "vault/playbooks/onboard-a-chio-developer.md",
+        "vault/playbooks/adopt-chio-developer-base.md",
+        "vault/playbooks/release-qualification.md"
+      ],
+      "expected": [
+        "vault/playbooks/governed-agent-memory.md"
+      ]
+    },
+    {
+      "id": "plan-md-carve-out-2026-07-08",
+      "category": "docs-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "PLAN.md",
+        "vault/playbooks/adopt-chio-developer-base.md",
+        "vault/playbooks/onboard-a-chio-developer.md",
+        "decisions/ADR-0002a-phase-0-slip.md",
+        "decisions/ADR-0002-phase-0-baselines.md"
+      ],
+      "expected": [
+        "PLAN.md"
+      ]
+    },
+    {
+      "id": "release-qualification-playbook-2026-07-08",
+      "category": "docs-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "vault/playbooks/release-qualification.md",
+        "vault/playbooks/adopt-chio-developer-base.md",
+        "vault/playbooks/onboard-a-chio-developer.md",
+        "vault/spec/receipt-commitment.md",
+        "vault/spec/protocol-wire-format.md"
+      ],
+      "expected": [
+        "vault/playbooks/release-qualification.md"
+      ]
+    },
+    {
+      "id": "policy-compiler-spec-2026-07-08",
+      "category": "docs-spec-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "vault/spec/policy-compiler.md",
+        "vault/spec/receipt-commitment.md",
+        "vault/spec/guard-pipeline.md",
+        "vault/playbooks/release-qualification.md",
+        "vault/spec/_README.md"
+      ],
+      "expected": [
+        "vault/spec/policy-compiler.md"
+      ]
+    },
+    {
+      "id": "protocol-wire-format-spec-2026-07-08",
+      "category": "docs-spec-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "vault/spec/protocol-wire-format.md",
+        "vault/spec/_README.md",
+        "vault/spec/sdk-conformance.md",
+        "vault/spec/receipt-commitment.md",
+        "vault/spec/policy-compiler.md"
+      ],
+      "expected": [
+        "vault/spec/protocol-wire-format.md"
+      ]
+    },
+    {
+      "id": "receipt-commitment-spec-2026-07-08",
+      "category": "docs-spec-retrieval",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "vault/spec/receipt-commitment.md",
+        "decisions/ADR-0005-signed-retrieval-eval.md",
+        "vault/spec/sdk-conformance.md",
+        "vault/spec/_README.md",
+        "vault/spec/capability-revocation.md"
+      ],
+      "expected": [
+        "vault/spec/receipt-commitment.md"
+      ]
+    },
+    {
+      "id": "capability-revocation-brief-2026-07-08",
+      "category": "feature-brief",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "vault/playbooks/revoke-a-capability.md",
+        "vault/spec/capability-revocation.md",
+        "vault/playbooks/governed-agent-memory.md",
+        "vault/spec/receipt-commitment.md",
+        "vault/playbooks/release-qualification.md"
+      ],
+      "expected": [
+        "vault/playbooks/revoke-a-capability.md"
+      ]
+    },
+    {
+      "id": "release-qualification-brief-2026-07-08",
+      "category": "feature-brief",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "vault/playbooks/release-qualification.md",
+        "vault/spec/receipt-commitment.md",
+        "vault/spec/protocol-wire-format.md",
+        "vault/spec/sdk-conformance.md",
+        "decisions/ADR-0005-signed-retrieval-eval.md"
+      ],
+      "expected": [
+        "vault/playbooks/release-qualification.md"
+      ]
+    },
+    {
+      "id": "signed-retrieval-brief-2026-07-08",
+      "category": "feature-brief",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "decisions/ADR-0005-signed-retrieval-eval.md",
+        "vault/playbooks/release-qualification.md",
+        "vault/spec/receipt-commitment.md",
+        "decisions/ADR-0002a-phase-0-slip.md",
+        "decisions/ADR-0002-phase-0-baselines.md"
+      ],
+      "expected": [
+        "decisions/ADR-0005-signed-retrieval-eval.md"
+      ]
+    },
+    {
+      "id": "chio-tool-registrar-bridge-2026-07-08",
+      "category": "graph-and-bridge",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "chio-pack/chio_pack/plugin.py",
+        "kb-engine/kb_engine/plugin.py",
+        "chio-pack/chio_pack/tools/fake_server.py",
+        "chio-pack/chio_pack/scaffold.py",
+        "chio-pack/chio_pack/tools/__init__.py"
+      ],
+      "expected": [
+        "chio-pack/chio_pack/plugin.py"
+      ]
+    },
+    {
+      "id": "mcp-gateway-bridge-2026-07-08",
+      "category": "graph-and-bridge",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "infra/chio-kb-mcp-server.py",
+        "chio-pack/chio_pack/plugin.py",
+        "infra/chio-kb-mcp-stub.py",
+        "chio-pack/chio_pack/tools/fake_server.py",
+        "chio-pack/chio_pack/tools/__init__.py"
+      ],
+      "expected": [
+        "infra/chio-kb-mcp-server.py"
+      ]
+    },
+    {
+      "id": "vault-sync-graphiti-bridge-2026-07-08",
+      "category": "graph-and-bridge",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "kb-engine/kb_engine/sync.py",
+        "kb-engine/kb_engine/ingesters/markdown.py",
+        "kb-engine/kb_engine/types.py",
+        "kb-engine/kb_engine/plugin.py",
+        "chio-pack/chio_pack/plugin.py"
+      ],
+      "expected": [
+        "kb-engine/kb_engine/sync.py"
+      ]
+    },
+    {
+      "id": "kb-impact-tool-2026-07-08",
+      "category": "graph-navigation-impact",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "chio-pack/chio_pack/tools/kb_impact.py",
+        "kb-engine/tests/test_ingesters_markdown.py",
+        "chio-pack/tests/test_check_imports.py",
+        "kb-engine/tests/test_eval_template.py",
+        "chio-pack/chio_pack/tools/kb_find_tests.py"
+      ],
+      "expected": [
+        "chio-pack/chio_pack/tools/kb_impact.py"
+      ]
+    },
+    {
+      "id": "kb-neighbors-tool-2026-07-08",
+      "category": "graph-navigation-impact",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "chio-pack/chio_pack/tools/kb_neighbors.py",
+        "kb-engine/kb_engine/store/neo4j.py",
+        "chio-pack/chio_pack/tools/kb_context.py",
+        "kb-engine/kb_engine/runtime.py",
+        "chio-pack/chio_pack/tools/kb_impact.py"
+      ],
+      "expected": [
+        "chio-pack/chio_pack/tools/kb_neighbors.py"
+      ]
+    },
+    {
+      "id": "neo4j-store-upsert-2026-07-08",
+      "category": "graph-navigation-impact",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "kb-engine/kb_engine/store/neo4j.py",
+        "kb-engine/kb_engine/ingest.py",
+        "kb-engine/kb_engine/store/vector.py",
+        "kb-engine/kb_engine/store/postgres.py",
+        "kb-engine/kb_engine/store/turbovec.py"
+      ],
+      "expected": [
+        "kb-engine/kb_engine/store/neo4j.py"
+      ]
+    },
+    {
+      "id": "agents-graphiti-hard-rule-2026-07-08",
+      "category": "graphiti-memory",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "AGENTS.md",
+        "kb-engine/kb_engine/sync.py",
+        "vault/playbooks/governed-agent-memory.md",
+        "vault/playbooks/onboard-a-chio-developer.md",
+        "PLAN.md"
+      ],
+      "expected": [
+        "AGENTS.md"
+      ]
+    },
+    {
+      "id": "governed-memory-playbook-2026-07-08",
+      "category": "graphiti-memory",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "vault/playbooks/governed-agent-memory.md",
+        "chio-pack/chio_pack/tools/kb_memory_add.py",
+        "kb-engine/kb_engine/sync.py",
+        "chio-pack/chio_pack/tools/kb_memory_query.py",
+        "chio-pack/chio_pack/tools/kb_memory_revoke.py"
+      ],
+      "expected": [
+        "vault/playbooks/governed-agent-memory.md"
+      ]
+    },
+    {
+      "id": "memory-module-signed-episodes-2026-07-08",
+      "category": "graphiti-memory",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "chio-pack/chio_pack/memory.py",
+        "chio-pack/chio_pack/tools/kb_memory_add.py",
+        "vault/playbooks/governed-agent-memory.md",
+        "chio-pack/chio_pack/tools/kb_memory_query.py",
+        "chio-pack/chio_pack/tools/kb_add_episode.py"
+      ],
+      "expected": [
+        "chio-pack/chio_pack/memory.py"
+      ]
+    },
+    {
+      "id": "boundary-check-script-2026-07-08",
+      "category": "operations",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "ops/ci/check-imports.py",
+        "ops/scripts/wave1-retrieval-a-chase.py",
+        "chio-pack/chio_pack/plugin.py",
+        "kb-engine/kb_engine/__init__.py",
+        "ops/ci/check-orphaned-crate-paths.py"
+      ],
+      "expected": [
+        "ops/ci/check-imports.py"
+      ]
+    },
+    {
+      "id": "dockerfile-chio-kb-mcp-2026-07-08",
+      "category": "operations",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "infra/Dockerfile.chio-kb-mcp",
+        "infra/chio-kb-mcp-server.py",
+        "chio-pack/chio_pack/mcp_gateway.py",
+        "infra/chio-kb-mcp-stub.py",
+        "chio-pack/chio_pack/tools/fake_server.py"
+      ],
+      "expected": [
+        "infra/Dockerfile.chio-kb-mcp"
+      ]
+    },
+    {
+      "id": "makefile-kb-eval-2026-07-08",
+      "category": "operations",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "Makefile",
+        "ops/ci/check-orphaned-crate-paths.py",
+        "chio-pack/chio_pack/eval/retrieval.py",
+        "chio-pack/chio_pack/tools/kb_eval.py",
+        "chio-pack/chio_pack/cli.py"
+      ],
+      "expected": [
+        "Makefile"
+      ]
+    },
+    {
+      "id": "test-chunker-2026-07-08",
+      "category": "test-discovery",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "kb-engine/tests/test_chunker.py",
+        "kb-engine/tests/test_ingesters_python.py",
+        "kb-engine/kb_engine/chunker.py",
+        "kb-engine/tests/test_ingesters_markdown.py",
+        "kb-engine/tests/test_ingesters_typescript.py"
+      ],
+      "expected": [
+        "kb-engine/tests/test_chunker.py"
+      ]
+    },
+    {
+      "id": "test-memory-tools-2026-07-08",
+      "category": "test-discovery",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "chio-pack/tests/test_memory_tools.py",
+        "chio-pack/chio_pack/tools/kb_memory_add.py",
+        "chio-pack/chio_pack/tools/kb_memory_query.py",
+        "chio-pack/chio_pack/tools/kb_memory_revoke.py",
+        "chio-pack/chio_pack/memory.py"
+      ],
+      "expected": [
+        "chio-pack/tests/test_memory_tools.py"
+      ]
+    },
+    {
+      "id": "test-tool-registrar-2026-07-08",
+      "category": "test-discovery",
+      "p_at_k": 1.0,
+      "mrr": 1.0,
+      "hits": [
+        "chio-pack/tests/test_tool_registrar.py",
+        "chio-pack/tests/test_plugin.py",
+        "chio-pack/tests/test_scaffold.py",
+        "chio-pack/chio_pack/plugin.py",
+        "kb-engine/tests/test_plugin.py"
+      ],
+      "expected": [
+        "chio-pack/tests/test_tool_registrar.py"
+      ]
+    }
+  ]
+}

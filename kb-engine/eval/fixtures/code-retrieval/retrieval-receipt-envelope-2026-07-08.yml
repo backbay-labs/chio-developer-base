@@ -1,0 +1,12 @@
+id: retrieval-receipt-envelope-2026-07-08
+category: code-retrieval
+query: |
+  Where is the RetrievalReceipt dataclass and self-signed retrieval
+  envelope defined in kb-engine?
+expected:
+  - kb-engine/kb_engine/receipt/envelope.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Wave 4A signed-retrieval primitive.

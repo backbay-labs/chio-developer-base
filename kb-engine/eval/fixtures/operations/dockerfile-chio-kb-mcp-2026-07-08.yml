@@ -1,0 +1,12 @@
+id: dockerfile-chio-kb-mcp-2026-07-08
+category: operations
+query: |
+  Where is the Dockerfile that builds the chio-kb-mcp gateway image
+  installing kb-engine and chio-pack and running the Wave 1 MCP server?
+expected:
+  - infra/Dockerfile.chio-kb-mcp
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Container image entry point for make kb-up.

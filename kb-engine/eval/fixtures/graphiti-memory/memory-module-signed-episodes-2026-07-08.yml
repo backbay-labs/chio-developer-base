@@ -1,0 +1,14 @@
+id: memory-module-signed-episodes-2026-07-08
+category: graphiti-memory
+query: |
+  Locate chio-pack/chio_pack/memory.py — the module that appends signed
+  governed memory entries to vault/episodes/session-*.md with
+  receipt_hash chaining for Graphiti-bound agent memory.
+expected:
+  - chio-pack/chio_pack/memory.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Implementation behind kb_memory_*; vault episodes remain canonical;
+  Graphiti is derived via vault-sync only.

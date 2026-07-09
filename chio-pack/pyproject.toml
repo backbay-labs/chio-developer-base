@@ -23,6 +23,12 @@ chio-dev = "chio_pack.cli:main"
 # Phase 0+: outcome eval runner.
 chio-pack-eval = "chio_pack.eval.runner:main"
 
+# Wave 1: retrieval eval + MCP gateway binaries (also used in Docker).
+chio-kb-eval = "chio_pack.eval.retrieval:main"
+chio-kb-mcp = "chio_pack.mcp_gateway:main"
+chio-kb-smoke = "chio_pack.smoke:main"
+chio-kb-reset = "chio_pack.reset:main"
+
 # Phase 2A: PR-impact gate backtest. Stub that exits with a clear blocker.
 # chio-pack-gate-backtest = "chio_pack.tools.gate_backtest:main"
 

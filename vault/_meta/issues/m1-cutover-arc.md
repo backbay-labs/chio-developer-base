@@ -11,6 +11,7 @@ labels:
   - milestone:M1
   - blocker:wave-2-cutover
   - cross-repo:arc
+  - wave:3
 related:
   - "[[../../../PLAN.md|PLAN.md Phase 1.6]]"
   - "[[../../decisions/_README|decisions/]]"
@@ -40,7 +41,47 @@ agent on this side because:
 So this issue is the hand-off doc. A person picking this up should be
 able to act on it without reading the Wave 2 conversation.
 
+## Wave 3 prep update — 2026-07-08
+
+Wave 3 prepares the Arc PR as a **thin Make wrapper cutover first**. Do not
+delete `arc/tools/knowledge-base/` in the initial PR; delete it only after the
+wrapper PR proves Arc CI is green against chio-developer-base.
+
+Prepared in chio-developer-base:
+
+- `ops/arc-cutover/README.md` — exact Arc PR operator steps.
+- `ops/arc-cutover/Makefile.kb-wrapper` — drop-in Make fragment preserving
+  Arc's `make kb-*` command surface while delegating to this repo.
+- `ops/arc-cutover/patch-arc-makefile.diff` — patch that changes Arc's
+  `KB_DIR ?= tools/knowledge-base` default to `KB_DIR ?= ../chio-developer-base`
+  and includes the wrapper.
+
+Prepared locally in Arc:
+
+- Branch: `cutover/kb-dir-chio-developer-base`
+- Change: `arc/Makefile` delegates `kb-status`, `kb-eval`, `kb-dogfood`, and
+  the other KB targets through `../chio-developer-base/ops/arc-cutover/Makefile.kb-wrapper`.
+- Verification run: `make -n kb-status && make -n kb-eval && make -n kb-dogfood`
+  prints delegated `make -C ../chio-developer-base ARC_REPO=/Users/connor/Medica/backbay/standalone/arc ...`
+  commands. No destructive KB command was run.
+
+Wave 3 checklist:
+
+- [x] Read Arc `Makefile` and confirm current `KB_DIR` plus `kb-*` targets.
+- [x] Add chio-developer-base cutover wrapper artifacts (`README`, wrapper, patch, `PR-CHECKLIST.md`).
+- [x] Create local Arc branch with the Makefile wrapper cutover (committed locally as `01d6a0d4c`; **not pushed**).
+- [x] Defer `tools/knowledge-base` deletion to a follow-up PR.
+- [x] Non-destructive live `make kb-status` from arc delegates and succeeds (2026-07-08 continuation).
+- [ ] Human runs full acceptance (`make kb-up && make kb-eval`) when ready.
+- [ ] Human opens Arc PR via [`ops/arc-cutover/PR-CHECKLIST.md`](../../../ops/arc-cutover/PR-CHECKLIST.md); no agent push.
+- [ ] Arc CI green on wrapper backend.
+- [ ] Follow-up PR deletes `tools/knowledge-base/`.
+
 ## What needs to happen on the arc side
+
+Historical Wave 2 handoff below expected the deletion to happen in the same
+Arc PR. Wave 3 narrows the first PR to the wrapper cutover; treat deletion
+items as follow-up cleanup after CI proves the new backend.
 
 ### 1. Delete the in-tree KB stack
 
@@ -109,9 +150,12 @@ the arc PR.
 
 ### 5. Receipts (Phase 2 forward dependency)
 
-`arc/crates/chio-receipts/` will be consumed by chio-developer-base
-in Phase 2B (M2 in scratchpad). Don't move or rename the crate as
-part of this cutover; that's a separate ADR.
+Receipt types live in `arc/crates/core/chio-core-types/` (module
+`chio_core_types::receipt`); the eval-report bundle verifier is
+`arc/crates/sdk/chio-eval-receipt/`. There is no
+`crates/chio-receipts/` crate — that path was a docs drift corrected
+in ADR-0002a. Don't move or rename these crates as part of this
+cutover; binding them for Phase 2B signed retrieval is a separate ADR.
 
 ## Arc CI signal that proves cutover landed
 

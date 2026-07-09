@@ -1,0 +1,12 @@
+id: test-chunker-2026-07-08
+category: test-discovery
+query: |
+  kb-engine/tests/test_chunker.py — pytest unit tests for paragraph and
+  hard-line chunker overlap and boundary behavior
+expected:
+  - kb-engine/tests/test_chunker.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Test-discovery fixture — surfacing kb-engine chunker regressions.

@@ -1,0 +1,12 @@
+id: vector-store-protocol-2026-07-08
+category: code-retrieval
+query: |
+  Where is the VectorStore Protocol defined in the engine so that
+  pgvector and TurboVec can be interchangeable adapters?
+expected:
+  - kb-engine/kb_engine/store/vector.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Wave 2 protocol extraction so a second pack can bring its own store.

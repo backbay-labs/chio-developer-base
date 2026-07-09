@@ -81,7 +81,7 @@ Verify that all gate-produced receipts are inclusion-proof-checkable against a p
 make kb-verify --receipts arc/release/rc-N/receipts/
 ```
 
-> **Phase 2B:** this `make` target is currently a Phase 2B blocker. Until then, run the existing arc receipt-verify CLI directly: `cd ../arc && cargo run -p chio-receipts -- verify rc-N/receipts/*.json`.
+> **Phase 2B:** this `make` target is currently a Phase 2B blocker. Until then, run the existing arc receipt-verify CLI directly: `cd ../arc && cargo run -p chio-eval-receipt -- verify rc-N/receipts/*.json`.
 
 **Receipt produced:** `receipt.evidence.rc-N`.
 
@@ -121,5 +121,5 @@ If you find yourself reading a Graphiti episode to decide whether a gate passed:
 
 ## Open questions
 
-- [ ] At Phase 2B, does signed retrieval inside `kb-verify` replace the manual `cargo run -p chio-receipts -- verify` step? Likely yes.
+- [ ] At Phase 2B, does signed retrieval inside `kb-verify` replace the manual `cargo run -p chio-eval-receipt -- verify` step? Likely yes.
 - [ ] Should Gate 1 require the SDK conformance suite to also produce a `receipt.conformance.recall` outcome eval result above 0.85? Defer to ADR after Phase 0 baselines are in.

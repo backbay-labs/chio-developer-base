@@ -1,0 +1,14 @@
+id: release-qualification-brief-2026-07-08
+category: feature-brief
+query: |
+  Agent editing brief for release qualification evidence gates: which
+  playbook describes rc-N conformance, security, and signed release
+  qualification receipts?
+expected:
+  - vault/playbooks/release-qualification.md
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Ports arc feature-brief-release-qualification onto the local
+  release-qualification playbook.

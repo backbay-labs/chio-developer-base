@@ -53,6 +53,11 @@ jobs:
         # Hard rule #3 (AGENTS.md): kb-engine cannot import chio_*.
         run: python3 ops/ci/check-imports.py
 
+      - name: Orphaned crate-path check (ADR-0002a)
+        # Fail closed on crates/chio-receipts/ — actual home is
+        # crates/core/chio-core-types (+ chio-eval-receipt).
+        run: python3 ops/ci/check-orphaned-crate-paths.py
+
       - name: kb-engine unit tests
         # Plugin protocol contracts, registry dispatch, dataclass behavior.
         run: |
@@ -68,6 +73,11 @@ jobs:
           cd chio-pack
           uv sync --group dev
           uv run python -m pytest tests/ -v
+
+      - name: Synthetic second-pack smoke
+        # Wave 2: generate demo-pack, install it, and prove the generic
+        # Registry entry-point path can load more than chio-pack.
+        run: make smoke-second-pack
 
       # === INFORMATIONAL gates ===
 

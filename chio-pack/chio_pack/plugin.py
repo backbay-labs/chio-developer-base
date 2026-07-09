@@ -33,6 +33,7 @@ from kb_engine import (
     ParsedFile,
     Registry,
 )
+from kb_engine.receipt import sign_response
 
 from . import schema
 from .tools import ALL_TOOLS
@@ -141,8 +142,24 @@ def chio_tool_registrar(server: object) -> None:
             tool.NAME,
             tool.DESCRIPTION,
             tool.INPUT_SCHEMA,
-            tool.call,
+            _signed_tool_call(tool.call),
         )
+
+
+def _signed_tool_call(call):
+    """Wrap successful retrieval-like tool responses in a dev receipt."""
+
+    def wrapped(arguments: dict[str, Any]) -> dict[str, Any]:
+        response = call(arguments)
+        if response.get("status") != "ok" or "receipt" in response:
+            return response
+        if not str(response.get("tool", "")).startswith("kb_"):
+            return response
+        if response.get("tool") in {"kb_eval", "kb_add_episode", "kb_memory_add", "kb_memory_revoke"}:
+            return response
+        return sign_response(response)
+
+    return wrapped
 
 
 # === FrontmatterHandler ===

@@ -1,0 +1,14 @@
+id: mcp-gateway-bridge-2026-07-08
+category: graph-and-bridge
+query: |
+  Locate infra/chio-kb-mcp-server.py — the MCP HTTP bridge that exposes
+  initialize, tools/list, and tools/call for the kb_* tool surface on
+  port 8111.
+expected:
+  - infra/chio-kb-mcp-server.py
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Local analogue of arc mcp-adapter graph-and-bridge: the carve-out
+  gateway is the protocol bridge into retrieval tools.

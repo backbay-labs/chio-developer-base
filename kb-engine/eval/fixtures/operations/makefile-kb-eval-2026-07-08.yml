@@ -1,0 +1,13 @@
+id: makefile-kb-eval-2026-07-08
+category: operations
+query: |
+  Where is the Makefile that defines make kb-eval, make kb-up,
+  make check-boundary, and make check-orphaned-crate-paths targets for
+  chio-developer-base?
+expected:
+  - Makefile
+metrics:
+  - p_at_k
+  - mrr
+notes: |
+  Operator entry point.

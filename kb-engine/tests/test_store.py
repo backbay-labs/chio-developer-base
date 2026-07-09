@@ -65,7 +65,7 @@ def test_postgres_bootstrap_runs_expected_ddl():
     assert any("CREATE SCHEMA IF NOT EXISTS chio_kb" in stmt for stmt in executed)
     assert any("CREATE TABLE IF NOT EXISTS chio_kb.code_chunks" in stmt for stmt in executed)
     assert any("vector(1536)" in stmt for stmt in executed)
-    assert any("ivfflat" in stmt for stmt in executed)
+    assert any("hnsw" in stmt for stmt in executed)
 
 
 def test_postgres_insert_code_chunks_validates_lengths():
@@ -102,6 +102,20 @@ def test_postgres_search_similar_validates_query_dim():
     store = PostgresStore(conn, embedding_dim=8)
     with pytest.raises(ValueError, match="query_vec dim"):
         store.search_similar([0.1] * 4)
+
+
+def test_postgres_search_similar_casts_query_as_vector():
+    """Bare float lists must not bind as double precision[] (Wave 1 live bug)."""
+    conn, cur = _mock_pg_connection()
+    cur.description = []
+    cur.fetchall.return_value = []
+    store = PostgresStore(conn, embedding_dim=4)
+    store.search_similar([0.1, 0.2, 0.3, 0.4])
+    sql, params = cur.execute.call_args[0]
+    assert "%s::vector" in sql
+    assert "<=> %s::vector" in sql
+    # Params are Vector adapter or literal string — never a raw list.
+    assert not any(isinstance(p, list) for p in params[:2])
 
 
 # === PostgresStore — multitenant schema parameterization ===
